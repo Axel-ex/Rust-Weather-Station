@@ -4,7 +4,9 @@ The **Rust Weather Station** is a fully-featured weather monitoring system built
 
 The weather station integrates several sensors using I2C protocol and handles data communication over Wi-Fi. This project showcases how Rust can be utilized for low-level hardware interaction, real-time data processing, and IoT applications.
 
-<img src="demo.jpg" width="50%" />
+<div align="center">
+    <img src="demo.jpg" width="50%" />
+</div>
 
 ### Hardware
 

@@ -7,15 +7,14 @@ use esp_idf_svc::hal::{
     gpio::*,
     i2c::{I2cConfig, I2cDriver},
     peripherals::Peripherals,
-    sys::{
-        esp_light_sleep_start, esp_sleep_enable_gpio_wakeup, esp_sleep_enable_timer_wakeup, ESP_OK,
-    },
+    sys::esp_light_sleep_start,
     units::Hertz,
 };
 use log::info;
 use mqtt::publish_wifi_data;
 use weather_station::*;
 mod mqtt;
+mod wifi;
 
 fn main() {
     esp_idf_svc::sys::link_patches();
@@ -41,8 +40,8 @@ fn main() {
         .unwrap_or_else(|e| log::error!("An Error occured setting the interrupts: {e}"));
 
     //WIFI
-    let mut wifi = wifi_init(p.modem).unwrap();
-    connect_wifi(&mut wifi).expect("couldn't connect to wifi");
+    let mut wifi = wifi::wifi_init(p.modem).unwrap();
+    wifi::connect_wifi(&mut wifi).expect("couldn't connect to wifi");
 
     //I2C PERIPHERALS
     let mut as5600 = As5600::new(i2c::RefCellDevice::new(&i2c_bus));
@@ -83,7 +82,7 @@ fn main() {
             check_rotation_flag(&mut pin_anemo);
 
             if check_time_passed() {
-                reconnect_wifi(&mut wifi);
+                wifi::reconnect_wifi(&mut wifi);
                 let wind_direction = get_wind_direction(&mut as5600);
                 let bme_readings = get_bme_readings(&mut bme);
 

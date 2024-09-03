@@ -4,14 +4,8 @@ use bosch_bme680::*;
 use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use embedded_hal_bus::i2c::*;
 use esp_idf_svc::{
-    eventloop::EspSystemEventLoop,
-    hal::{delay::Ets, gpio::*, i2c::I2cDriver, modem::Modem},
-    netif::NetifStatus,
-    nvs::EspDefaultNvsPartition,
-    sys::{
-        esp_light_sleep_start, esp_sleep_enable_gpio_wakeup, esp_sleep_enable_timer_wakeup, ESP_OK,
-    },
-    wifi::{BlockingWifi, ClientConfiguration, Configuration, EspWifi},
+    hal::{delay::Ets, gpio::*, i2c::I2cDriver},
+    sys::{esp_sleep_enable_gpio_wakeup, esp_sleep_enable_timer_wakeup},
 };
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
@@ -46,48 +40,6 @@ fn rain_pin_callback() {
 
 fn anemo_pin_callback() {
     ROTATION_FLAG.store(true, Ordering::Relaxed);
-}
-
-//WIFI
-pub fn wifi_init<'a>(modem: Modem) -> Result<BlockingWifi<EspWifi<'a>>> {
-    let sys_loop = EspSystemEventLoop::take().expect("wifi_init: fail taking eventloop");
-    let nvs = EspDefaultNvsPartition::take().expect("wifi_init: fail taking nvs");
-
-    let wifi = BlockingWifi::wrap(EspWifi::new(modem, sys_loop.clone(), Some(nvs))?, sys_loop)?;
-
-    Ok(wifi)
-}
-
-pub fn connect_wifi(wifi: &mut BlockingWifi<EspWifi<'static>>) -> Result<()> {
-    let wifi_config: Configuration = Configuration::Client(ClientConfiguration {
-        ssid: heapless::String::try_from(CONFIG.wifi_ssid).expect("Invalid WIFI SSID"),
-        bssid: None,
-        password: heapless::String::try_from(CONFIG.wifi_pass).expect("Invalid WiFi password"),
-        ..Default::default()
-    });
-
-    wifi.set_configuration(&wifi_config)?;
-    log::info!("Starting wifi");
-    wifi.start()?;
-
-    log::info!("Connecting.....");
-    wifi.connect()?;
-
-    wifi.wait_netif_up()?;
-    log::info!("Netif up");
-
-    Ok(())
-}
-
-pub fn reconnect_wifi(wifi: &mut BlockingWifi<EspWifi<'static>>) {
-    while !wifi.is_connected().unwrap() {
-        wifi.connect()
-            .map_err(|e| log::error!("Couldn't reconnect to wifi: {e}"))
-            .ok();
-    }
-    if !wifi.is_up().unwrap() {
-        wifi.wait_netif_up().unwrap();
-    }
 }
 
 pub fn set_intterupt(

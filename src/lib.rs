@@ -6,7 +6,11 @@ use embedded_hal_bus::i2c::*;
 use esp_idf_svc::{
     eventloop::EspSystemEventLoop,
     hal::{delay::Ets, gpio::*, i2c::I2cDriver, modem::Modem},
+    netif::NetifStatus,
     nvs::EspDefaultNvsPartition,
+    sys::{
+        esp_light_sleep_start, esp_sleep_enable_gpio_wakeup, esp_sleep_enable_timer_wakeup, ESP_OK,
+    },
     wifi::{BlockingWifi, ClientConfiguration, Configuration, EspWifi},
 };
 use once_cell::sync::Lazy;
@@ -63,16 +67,27 @@ pub fn connect_wifi(wifi: &mut BlockingWifi<EspWifi<'static>>) -> Result<()> {
     });
 
     wifi.set_configuration(&wifi_config)?;
-    log::debug!("Starting wifi");
+    log::info!("Starting wifi");
     wifi.start()?;
 
-    log::debug!("Connecting.....");
+    log::info!("Connecting.....");
     wifi.connect()?;
 
     wifi.wait_netif_up()?;
-    log::debug!("Netif up");
+    log::info!("Netif up");
 
     Ok(())
+}
+
+pub fn reconnect_wifi(wifi: &mut BlockingWifi<EspWifi<'static>>) {
+    while !wifi.is_connected().unwrap() {
+        wifi.connect()
+            .map_err(|e| log::error!("Couldn't reconnect to wifi: {e}"))
+            .ok();
+    }
+    if !wifi.is_up().unwrap() {
+        wifi.wait_netif_up().unwrap();
+    }
 }
 
 pub fn set_intterupt(
@@ -87,6 +102,8 @@ pub fn set_intterupt(
     unsafe {
         pin_rain.subscribe(rain_pin_callback)?;
         pin_anemo.subscribe(anemo_pin_callback)?;
+        esp_sleep_enable_gpio_wakeup();
+        esp_sleep_enable_timer_wakeup(60_000_000); //wake up every 60 seconds
     }
 
     pin_rain.enable_interrupt()?;
@@ -101,7 +118,7 @@ pub fn check_time_passed() -> bool {
     let now = Instant::now();
     let mut last_time = LAST_TIME.lock().unwrap();
 
-    if now.duration_since(*last_time) >= Duration::from_secs(10) {
+    if now.duration_since(*last_time) >= Duration::from_secs(60) {
         *last_time = now; // Reset the last time
         return true;
     }
@@ -176,6 +193,17 @@ pub fn get_wind_direction(as5600: &mut As5600<RefCellDevice<I2cDriver>>) -> Stri
     direction.to_string()
 }
 
-pub fn measure_wind_speed() -> u32 {
-    42
-}
+// fn initialize_bme680<'a>(
+//     i2c_bus: &'a RefCell<I2cDriver<'a>>,
+//     delay_prov: &'a mut Ets,
+// ) -> Result<Bme680<i2c::RefCellDevice<'a, I2cDriver<'a>>, &'a mut Ets>, anyhow::Error> {
+//     let bme = Bme680::new(
+//         i2c::RefCellDevice::new(i2c_bus),
+//         DeviceAddress::Secondary,
+//         delay_prov,
+//         &Configuration::default(),
+//         20,
+//     );
+//
+//     bme.map_err(|e| anyhow::anyhow!("BME680 initialization failed: {:?}", e))
+// }

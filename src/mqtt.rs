@@ -1,13 +1,9 @@
 use anyhow::Result;
 use core::sync::atomic::Ordering;
 use esp_idf_svc::{
-    hal::gpio::*,
     mqtt::client::*,
     wifi::{BlockingWifi, EspWifi},
 };
-use once_cell::sync::Lazy;
-use std::sync::Mutex;
-use std::time::{Duration, Instant};
 use weather_station::*;
 
 //MQTT
@@ -41,7 +37,8 @@ pub fn publish_bme_data(mqtt_cli: &mut EspMqttClient, bme_readings: bosch_bme680
             true,
             payload.as_bytes(),
         )
-        .expect("fail publishing bme data");
+        .map_err(|e| log::error!("fail publishing bme data: {e}"))
+        .ok();
 }
 
 pub fn publish_anemo_data(mqtt_cli: &mut EspMqttClient, wind_direction: String) {
@@ -54,9 +51,10 @@ pub fn publish_anemo_data(mqtt_cli: &mut EspMqttClient, wind_direction: String) 
             true,
             wind_direction.as_bytes(),
         )
-        .expect("fail publishing anemo data");
-
-    let rotations = ROTATION_COUNT.load(Ordering::Relaxed);
+        .map_err(|e| log::error!("fail publishing anemo data: {e}"))
+        .ok();
+    //calculation with anemo dimension * 3.6 to have km/h
+    let wind_speed = (ROTATION_COUNT.load(Ordering::Relaxed) as f32) * 0.0173833 * 3.6;
     ROTATION_COUNT.store(0, Ordering::Relaxed);
     let topic = format!("{}/wind_speed", CONFIG.topic);
 
@@ -65,7 +63,7 @@ pub fn publish_anemo_data(mqtt_cli: &mut EspMqttClient, wind_direction: String) 
             &topic,
             QoS::AtLeastOnce,
             true,
-            rotations.to_string().as_bytes(),
+            wind_speed.to_string().as_bytes(),
         )
         .map_err(|e| {
             log::error!("Couldn't publish wind speed: {e}");
@@ -75,7 +73,7 @@ pub fn publish_anemo_data(mqtt_cli: &mut EspMqttClient, wind_direction: String) 
 
 pub fn publish_rain_data(mqtt_cli: &mut EspMqttClient) {
     let topic = format!("{}/rain", CONFIG.topic);
-    let rain_count = RAIN_COUNT.load(Ordering::Relaxed);
+    let rain_quantity = (RAIN_COUNT.load(Ordering::Relaxed) as f32) * 0.233;
     RAIN_COUNT.store(0, Ordering::Relaxed);
 
     mqtt_cli
@@ -83,7 +81,7 @@ pub fn publish_rain_data(mqtt_cli: &mut EspMqttClient) {
             &topic,
             QoS::AtLeastOnce,
             true,
-            rain_count.to_string().as_bytes(),
+            rain_quantity.to_string().as_bytes(),
         )
         .map_err(|e| {
             log::error!("Error publishing rain data: {e}");

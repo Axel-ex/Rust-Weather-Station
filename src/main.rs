@@ -7,6 +7,9 @@ use esp_idf_svc::hal::{
     gpio::*,
     i2c::{I2cConfig, I2cDriver},
     peripherals::Peripherals,
+    sys::{
+        esp_light_sleep_start, esp_sleep_enable_gpio_wakeup, esp_sleep_enable_timer_wakeup, ESP_OK,
+    },
     units::Hertz,
 };
 use log::info;
@@ -69,17 +72,20 @@ fn main() {
                 }
                 info!("Connection closed");
             })
-            .unwrap(); //TODO: Try to get rid of this, try to disconnect raspberry
+            .expect("An error occured with mqtt client");
 
         loop {
+            unsafe {
+                esp_light_sleep_start();
+            }
+
             check_rain_flag(&mut pin_rain);
             check_rotation_flag(&mut pin_anemo);
 
             if check_time_passed() {
+                reconnect_wifi(&mut wifi);
                 let wind_direction = get_wind_direction(&mut as5600);
                 let bme_readings = get_bme_readings(&mut bme);
-
-                //TODO: check rain flag, check anemo_flag
 
                 publish_wifi_data(&mut mqtt_cli, &mut wifi);
                 mqtt::publish_bme_data(&mut mqtt_cli, bme_readings);
@@ -87,7 +93,7 @@ fn main() {
                 mqtt::publish_rain_data(&mut mqtt_cli);
             }
 
-            FreeRtos::delay_ms(200);
+            FreeRtos::delay_ms(100);
         }
     })
 }

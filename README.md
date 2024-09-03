@@ -8,7 +8,7 @@ The weather station integrates several sensors using I2C protocol and handles da
 
 ### Hardware
 
-- **Microcontroller/SoC**: ESP32 (or a similar microcontroller) for managing the sensors and Wi-Fi connectivity.
+- **Microcontroller**: ESP32.
 - **Sensors**:
   - **AS5600**: A magnetic rotary position sensor for detecting wind direction.
   - **BME680**: An environmental sensor for measuring temperature, humidity, pressure, and gas.

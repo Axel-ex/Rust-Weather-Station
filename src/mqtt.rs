@@ -8,14 +8,11 @@ use std::time::Duration;
 use weather_station::*;
 
 //MQTT
-pub fn mqtt_create(
-    url: &str,
-    client_id: &str,
-) -> Result<(EspMqttClient<'static>, EspMqttConnection)> {
+pub fn mqtt_create() -> Result<(EspMqttClient<'static>, EspMqttConnection)> {
     let (mqtt_client, mqtt_connection) = EspMqttClient::new(
-        url,
+        &CONFIG.broker_url,
         &MqttClientConfiguration {
-            client_id: Some(client_id),
+            client_id: Some(CONFIG.client_id),
             username: Some(CONFIG.mqtt_user),
             password: Some(CONFIG.mqtt_pass),
             keep_alive_interval: Some(Duration::from_secs(100)),

@@ -55,9 +55,7 @@ fn main() {
     .expect("Fail initiating bme");
 
     // MQTT LOOP
-    let (mut mqtt_cli, mut mqtt_conn) =
-        mqtt::mqtt_create(CONFIG.broker_url, CONFIG.client_id).expect("Fail creating mqtt client");
-
+    let (mut mqtt_cli, mut mqtt_conn) = mqtt::mqtt_create().expect("Fail creating mqtt client");
     std::thread::scope(|s| {
         info!("Starting MQTT client");
 

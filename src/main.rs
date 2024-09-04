@@ -33,7 +33,7 @@ fn main() {
     let i2c_bus = RefCell::new(i2c);
     let mut delay_prov = Ets;
 
-    //PIN_ANEMO
+    //PIN_INTERRUPTS
     let mut pin_anemo = PinDriver::input(p.pins.gpio27).unwrap();
     let mut pin_rain = PinDriver::input(p.pins.gpio25).unwrap();
     set_intterupt(&mut pin_rain, &mut pin_anemo)
@@ -54,7 +54,7 @@ fn main() {
     )
     .expect("Fail initiating bme");
 
-    // MQTT Loop
+    // MQTT LOOP
     let (mut mqtt_cli, mut mqtt_conn) =
         mqtt::mqtt_create(CONFIG.broker_url, CONFIG.client_id).expect("Fail creating mqtt client");
 
@@ -73,7 +73,7 @@ fn main() {
             })
             .expect("An error occurred with mqtt client");
 
-        let active_duration = Duration::from_secs(CONFIG.active_duration_s + 1); // 1 minute
+        let active_duration = Duration::from_secs(CONFIG.active_duration_s + 1);
         let start_time = Instant::now();
 
         while start_time.elapsed() < active_duration {

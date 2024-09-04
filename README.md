@@ -1,9 +1,6 @@
 ## About
 
-The **Rust Weather Station** is a fully-featured weather monitoring system built using Rust and embedded hardware components. Designed to be reliable, this project leverages the power of Rust for embedded systems to gather real-time environmental data such as temperature, humidity, pressure, wind speed, wind direction, and rainfall. The gathered data is then published to an MQTT server, making it accessible for further use.
-
-The weather station integrates several sensors using I2C protocol and handles data communication over Wi-Fi. This project showcases how Rust can be utilized for low-level hardware interaction, real-time data processing, and IoT applications.
-
+The **Rust Weather Station** is a fully-featured weather monitoring system built using Rust and embedded hardware components. Designed to be reliable, this project leverages the power of Rust for embedded systems to gather real-time environmental data such as temperature, humidity, pressure, wind speed, wind direction, and rainfall. The gathered data is then published to an MQTT server, making it accessible for further use. 
 <div align="center">
     <img src="demo.jpg" width="50%" />
 </div>
@@ -11,14 +8,13 @@ The weather station integrates several sensors using I2C protocol and handles da
 ## Hardware
 
 - **Microcontroller**: ESP32.
-- **Sensors**:
-  - **AS5600**: A magnetic rotary position sensor for detecting wind direction.
-  - **BME680**: An environmental sensor for measuring temperature, humidity, pressure, and gas.
-  - **Hall effect sensors**: to embed into the anemometer and rain gauge.
-  - **18650 Lithium ion battery**.
-  - **12V solar pannel**: charges the batteries.
-  - **CN3791 solar charger**: charges the batteries when the sun is up. Protects against overcharge and overdischarge.
-  - **MT3608 step up converter**: Steps up the output voltage to 5v to feed the esp32.
+- **AS5600**: A magnetic rotary position sensor for detecting wind direction.
+- **BME680**: An environmental sensor for measuring temperature, humidity, pressure, and gas.
+- **Hall effect sensors**: to embed into the anemometer and rain gauge.
+- **18650 Lithium ion battery**.
+- **12V solar pannel**: charges the batteries.
+- **CN3791 solar charger**: charges the batteries when the sun is up. Protects against overcharge and overdischarge.
+- **MT3608 step up converter**: Steps up the output voltage to 5v to feed the esp32.
 
 ## Key Features
 

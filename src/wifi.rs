@@ -37,14 +37,3 @@ pub fn connect_wifi(wifi: &mut BlockingWifi<EspWifi<'static>>) -> Result<()> {
 
     Ok(())
 }
-
-pub fn reconnect_wifi(wifi: &mut BlockingWifi<EspWifi<'static>>) {
-    while !wifi.is_connected().unwrap() {
-        wifi.connect()
-            .map_err(|e| log::error!("Couldn't reconnect to wifi: {e}"))
-            .ok();
-    }
-    if !wifi.is_up().unwrap() {
-        wifi.wait_netif_up().unwrap();
-    }
-}

@@ -18,7 +18,7 @@ pub fn mqtt_create(
             client_id: Some(client_id),
             username: Some(CONFIG.mqtt_user),
             password: Some(CONFIG.mqtt_pass),
-            connection_refresh_interval: Duration::from_secs(70),
+            keep_alive_interval: Some(Duration::from_secs(100)),
             ..Default::default()
         },
     )?;
@@ -35,7 +35,7 @@ pub fn publish_bme_data(mqtt_cli: &mut EspMqttClient, bme_readings: bosch_bme680
     mqtt_cli
         .publish(
             bme_topic.as_str(),
-            QoS::AtLeastOnce,
+            QoS::ExactlyOnce,
             true,
             payload.as_bytes(),
         )
@@ -49,7 +49,7 @@ pub fn publish_anemo_data(mqtt_cli: &mut EspMqttClient, wind_direction: String) 
     mqtt_cli
         .publish(
             anemo_topic.as_str(),
-            QoS::AtLeastOnce,
+            QoS::ExactlyOnce,
             true,
             wind_direction.as_bytes(),
         )
@@ -63,7 +63,7 @@ pub fn publish_anemo_data(mqtt_cli: &mut EspMqttClient, wind_direction: String) 
     mqtt_cli
         .publish(
             &topic,
-            QoS::AtLeastOnce,
+            QoS::ExactlyOnce,
             true,
             wind_speed.to_string().as_bytes(),
         )
@@ -81,7 +81,7 @@ pub fn publish_rain_data(mqtt_cli: &mut EspMqttClient) {
     mqtt_cli
         .publish(
             &topic,
-            QoS::AtLeastOnce,
+            QoS::ExactlyOnce,
             true,
             rain_quantity.to_string().as_bytes(),
         )
@@ -102,7 +102,7 @@ pub fn publish_wifi_data(mqtt_cli: &mut EspMqttClient, wifi: &mut BlockingWifi<E
                 mqtt_cli
                     .publish(
                         &topic,
-                        QoS::AtLeastOnce,
+                        QoS::ExactlyOnce,
                         true,
                         net.signal_strength.to_string().as_bytes(),
                     )

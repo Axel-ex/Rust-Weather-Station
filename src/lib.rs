@@ -26,6 +26,12 @@ pub struct Config {
     wifi_pass: &'static str,
     #[default("")]
     topic: &'static str,
+    #[default("")]
+    client_id: &'static str,
+    #[default(60_000_000)]
+    deep_sleep_interval_us: u64,
+    #[default(61)]
+    active_duration_s: u64,
 }
 
 // GLOBAL ATOMIC VAR
@@ -55,7 +61,7 @@ pub fn set_intterupt(
         pin_rain.subscribe(rain_pin_callback)?;
         pin_anemo.subscribe(anemo_pin_callback)?;
         esp_sleep_enable_gpio_wakeup();
-        esp_sleep_enable_timer_wakeup(60_000_000); //wake up every 60 seconds
+        esp_sleep_enable_timer_wakeup(CONFIG.deep_sleep_interval_us); //wake up every 60 seconds
     }
 
     pin_rain.enable_interrupt()?;
@@ -70,7 +76,7 @@ pub fn check_time_passed() -> bool {
     let now = Instant::now();
     let mut last_time = LAST_TIME.lock().unwrap();
 
-    if now.duration_since(*last_time) >= Duration::from_secs(60) {
+    if now.duration_since(*last_time) >= Duration::from_secs(CONFIG.active_duration_s) {
         *last_time = now; // Reset the last time
         return true;
     }

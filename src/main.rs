@@ -11,7 +11,6 @@ use esp_idf_svc::hal::{
     units::Hertz,
 };
 use log::info;
-use mqtt::publish_wifi_data;
 use std::time::{Duration, Instant};
 use weather_station::*;
 mod mqtt;
@@ -20,7 +19,7 @@ mod wifi;
 fn main() {
     esp_idf_svc::sys::link_patches();
     esp_idf_svc::log::EspLogger::initialize_default();
-    esp_idf_svc::log::set_target_level("weather-station", log::LevelFilter::Debug).unwrap();
+    esp_idf_svc::log::set_target_level("weather-station", log::LevelFilter::Error).unwrap();
 
     //SETUP
     let p = Peripherals::take().unwrap();
@@ -57,7 +56,7 @@ fn main() {
 
     // MQTT Loop
     let (mut mqtt_cli, mut mqtt_conn) =
-        mqtt::mqtt_create(CONFIG.broker_url, CONFIG.mqtt_user).expect("Fail creating mqtt client");
+        mqtt::mqtt_create(CONFIG.broker_url, CONFIG.client_id).expect("Fail creating mqtt client");
 
     std::thread::scope(|s| {
         info!("Starting MQTT client");
@@ -74,8 +73,7 @@ fn main() {
             })
             .expect("An error occurred with mqtt client");
 
-        // Stay awake for a defined period (e.g., 1 minute)
-        let active_duration = Duration::from_secs(65); // 1 minute
+        let active_duration = Duration::from_secs(CONFIG.active_duration_s + 1); // 1 minute
         let start_time = Instant::now();
 
         while start_time.elapsed() < active_duration {
@@ -83,20 +81,17 @@ fn main() {
             check_rotation_flag(&mut pin_anemo);
 
             if check_time_passed() {
-                wifi::reconnect_wifi(&mut wifi);
                 let wind_direction = get_wind_direction(&mut as5600);
                 let bme_readings = get_bme_readings(&mut bme);
 
-                publish_wifi_data(&mut mqtt_cli, &mut wifi);
+                mqtt::publish_wifi_data(&mut mqtt_cli, &mut wifi);
                 mqtt::publish_bme_data(&mut mqtt_cli, bme_readings);
                 mqtt::publish_anemo_data(&mut mqtt_cli, wind_direction);
                 mqtt::publish_rain_data(&mut mqtt_cli);
             }
-
             FreeRtos::delay_ms(100);
         }
 
-        // After 1 minute, enter deep sleep
         info!("Going to deep sleep...");
         unsafe {
             esp_deep_sleep_start();

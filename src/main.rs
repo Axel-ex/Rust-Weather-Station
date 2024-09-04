@@ -7,11 +7,12 @@ use esp_idf_svc::hal::{
     gpio::*,
     i2c::{I2cConfig, I2cDriver},
     peripherals::Peripherals,
-    sys::esp_light_sleep_start,
+    sys::esp_deep_sleep_start,
     units::Hertz,
 };
 use log::info;
 use mqtt::publish_wifi_data;
+use std::time::{Duration, Instant};
 use weather_station::*;
 mod mqtt;
 mod wifi;
@@ -54,14 +55,14 @@ fn main() {
     )
     .expect("Fail initiating bme");
 
-    //MQTT LOOP
+    // MQTT Loop
     let (mut mqtt_cli, mut mqtt_conn) =
         mqtt::mqtt_create(CONFIG.broker_url, CONFIG.mqtt_user).expect("Fail creating mqtt client");
 
     std::thread::scope(|s| {
         info!("Starting MQTT client");
 
-        //Creates a thread that will keep alive the connection between broker and client
+        // Create a thread that will keep alive the connection between broker and client
         std::thread::Builder::new()
             .stack_size(6000)
             .spawn_scoped(s, move || {
@@ -71,13 +72,13 @@ fn main() {
                 }
                 info!("Connection closed");
             })
-            .expect("An error occured with mqtt client");
+            .expect("An error occurred with mqtt client");
 
-        loop {
-            unsafe {
-                esp_light_sleep_start();
-            }
+        // Stay awake for a defined period (e.g., 1 minute)
+        let active_duration = Duration::from_secs(65); // 1 minute
+        let start_time = Instant::now();
 
+        while start_time.elapsed() < active_duration {
             check_rain_flag(&mut pin_rain);
             check_rotation_flag(&mut pin_anemo);
 
@@ -94,5 +95,11 @@ fn main() {
 
             FreeRtos::delay_ms(100);
         }
-    })
+
+        // After 1 minute, enter deep sleep
+        info!("Going to deep sleep...");
+        unsafe {
+            esp_deep_sleep_start();
+        }
+    });
 }

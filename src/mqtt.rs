@@ -4,6 +4,7 @@ use esp_idf_svc::{
     mqtt::client::*,
     wifi::{BlockingWifi, EspWifi},
 };
+use std::time::Duration;
 use weather_station::*;
 
 //MQTT
@@ -17,6 +18,7 @@ pub fn mqtt_create(
             client_id: Some(client_id),
             username: Some(CONFIG.mqtt_user),
             password: Some(CONFIG.mqtt_pass),
+            connection_refresh_interval: Duration::from_secs(70),
             ..Default::default()
         },
     )?;
@@ -42,7 +44,7 @@ pub fn publish_bme_data(mqtt_cli: &mut EspMqttClient, bme_readings: bosch_bme680
 }
 
 pub fn publish_anemo_data(mqtt_cli: &mut EspMqttClient, wind_direction: String) {
-    let anemo_topic = format!("{}/wind_direction", CONFIG.topic);
+    let anemo_topic = format!("{}/anemo/wind_direction", CONFIG.topic);
 
     mqtt_cli
         .publish(
@@ -56,7 +58,7 @@ pub fn publish_anemo_data(mqtt_cli: &mut EspMqttClient, wind_direction: String) 
     //calculation with anemo dimension * 3.6 to have km/h
     let wind_speed = (ROTATION_COUNT.load(Ordering::Relaxed) as f32) * 0.0173833 * 3.6;
     ROTATION_COUNT.store(0, Ordering::Relaxed);
-    let topic = format!("{}/wind_speed", CONFIG.topic);
+    let topic = format!("{}/anemo/wind_speed", CONFIG.topic);
 
     mqtt_cli
         .publish(

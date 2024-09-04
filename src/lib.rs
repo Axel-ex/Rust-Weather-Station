@@ -144,18 +144,3 @@ pub fn get_wind_direction(as5600: &mut As5600<RefCellDevice<I2cDriver>>) -> Stri
 
     direction.to_string()
 }
-
-// fn initialize_bme680<'a>(
-//     i2c_bus: &'a RefCell<I2cDriver<'a>>,
-//     delay_prov: &'a mut Ets,
-// ) -> Result<Bme680<i2c::RefCellDevice<'a, I2cDriver<'a>>, &'a mut Ets>, anyhow::Error> {
-//     let bme = Bme680::new(
-//         i2c::RefCellDevice::new(i2c_bus),
-//         DeviceAddress::Secondary,
-//         delay_prov,
-//         &Configuration::default(),
-//         20,
-//     );
-//
-//     bme.map_err(|e| anyhow::anyhow!("BME680 initialization failed: {:?}", e))
-// }

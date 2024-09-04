@@ -25,7 +25,7 @@ The weather station integrates several sensors using I2C protocol and handles da
 - **Multiple Sensors**: Supports various sensors for comprehensive weather data collection.
 - **MQTT Integration**: Data is published to an MQTT broker, making it easy to integrate with IoT platforms like Home Assistant.
 - **Interrupt Handling**: Uses GPIO interrupts to handle events such as wind speed changes and rainfall detection.
-- **Deep sleep mode**: the esp32 is configured to enter deep sleep mode as much as he can to save up battery power.
+- **Deep sleep mode**: the ESP32 is configured to enter deep sleep mode as much as he can to save up battery power.
 
 ### Implementation
 
@@ -33,17 +33,19 @@ The weather station integrates several sensors using I2C protocol and handles da
   - **AS5600**: The AS5600 sensor is used to measure wind direction. It communicates via I2C, and the data is read and processed to determine the exact direction of the wind.
   - **BME680**: This sensor provides temperature, humidity, pressure, and gas readings. It is also connected via I2C and configured with custom settings to ensure accurate environmental data collection.
   Since Rust borrow checker doesn't allow sharing multiple mutable references, *embedded_hal_bus* crate was used since it provides utilities to share the I2C driver between the peripherals.
-
+<br><br/>
 - **Interrupts Handling**:
   - **Anemometer and Rain Gauge**: These sensors use GPIO pins to generate interrupts based on the triggering of hall effect sensor by the passage of a magnet above. Upon the trigerring of an interrupt, the corresponding global flag is raised. Because of the API design, interrupt have to be manually reactivated outside of the ISR upon fireing. the `check_rain_flag()` and `check_rotation_flag()` functions poll the flags and re-activate interrupts on the gpio that received the interrupt.
+<br><br/>
 
 - **MQTT Communication**:
-  - **Data Publishing**: The collected data from the sensors is published to an MQTT broker using the MQTT protocol. The `publish_wifi_data`, `publish_bme_data`, `publish_anemo_data`, and `publish_rain_data` functions handle the publication of different sensor data. Data is published at regular interval allowing the esp to enter deep sleep mode when innactive.
+  - **Data Publishing**: The collected data from the sensors is published to an MQTT broker using the MQTT protocol. The `publish_wifi_data`, `publish_bme_data`, `publish_anemo_data`, and `publish_rain_data` functions handle the publication of different sensor data. Data is published at regular interval allowing the ESP32 to enter deep sleep mode when innactive.
   - **Connection Management**: The MQTT connection is maintained in a separate thread, ensuring that the weather station remains connected to the broker and can send/receive messages in real-time.
+<br><br/>
 
 - **Deep sleep mode**:
-  - Active for **1min30**: The esp catches the interrupt and resets the flags accordingly. When `check_time_passed()` returns true, the data is published.
-  - Deep sleep for **5min**: The esp then enters a deep sleep mode during which power consumption diminishes greatly.
+  - Active for **1min30**: The ESP32 catches the interrupts and resets the flags accordingly. When `check_time_passed()` returns true, the data is published.
+  - Deep sleep for **5min**: The ESP32 then enters a deep sleep mode during which power consumption diminishes greatly.
 
 
 ### Resources

@@ -1,4 +1,4 @@
-### About
+## About
 
 The **Rust Weather Station** is a fully-featured weather monitoring system built using Rust and embedded hardware components. Designed to be reliable, this project leverages the power of Rust for embedded systems to gather real-time environmental data such as temperature, humidity, pressure, wind speed, wind direction, and rainfall. The gathered data is then published to an MQTT server, making it accessible for further use.
 
@@ -8,7 +8,7 @@ The weather station integrates several sensors using I2C protocol and handles da
     <img src="demo.jpg" width="50%" />
 </div>
 
-### Hardware
+## Hardware
 
 - **Microcontroller**: ESP32.
 - **Sensors**:
@@ -20,14 +20,14 @@ The weather station integrates several sensors using I2C protocol and handles da
   - **CN3791 solar charger**: charges the batteries when the sun is up. Protects against overcharge and overdischarge.
   - **MT3608 step up converter**: Steps up the output voltage to 5v to feed the esp32.
 
-### Key Features
+## Key Features
 
 - **Multiple Sensors**: Supports various sensors for comprehensive weather data collection.
 - **MQTT Integration**: Data is published to an MQTT broker, making it easy to integrate with IoT platforms like Home Assistant.
 - **Interrupt Handling**: Uses GPIO interrupts to handle events such as wind speed changes and rainfall detection.
 - **Deep sleep mode**: the ESP32 is configured to enter deep sleep mode as much as he can to save up battery power.
 
-### Implementation
+## Implementation
 
 - **Sensor Integration**:
   - **AS5600**: The AS5600 sensor is used to measure wind direction. It communicates via I2C, and the data is read and processed to determine the exact direction of the wind.
@@ -48,5 +48,5 @@ The weather station integrates several sensors using I2C protocol and handles da
   - Deep sleep for **5min**: The ESP32 then enters a deep sleep mode during which power consumption diminishes greatly.
 
 
-### Resources
+## Resources
 All .stl files can be downloaded from this link (https://www.printables.com/model/729382-yaws-yet-another-weather-station/files) ready to be printed!

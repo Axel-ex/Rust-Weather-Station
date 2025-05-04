@@ -1,0 +1,7 @@
+0000000000000000000000000000000000000000 bdf8bfdd0682ddc4bffcd431ac513806a72292d5 Axel chabrerie <114242486+Axel-ex@users.noreply.github.com> 1737374471 +0000	commit (initial): not working with embedded_dht
+bdf8bfdd0682ddc4bffcd431ac513806a72292d5 bdf8bfdd0682ddc4bffcd431ac513806a72292d5 Axel chabrerie <114242486+Axel-ex@users.noreply.github.com> 1737375865 +0000	reset: moving to HEAD
+bdf8bfdd0682ddc4bffcd431ac513806a72292d5 b90c2e983b01f46ad83c5d28b2ec1f39e93ef8b6 Axel chabrerie <114242486+Axel-ex@users.noreply.github.com> 1737376701 +0000	commit: working with dht22
+b90c2e983b01f46ad83c5d28b2ec1f39e93ef8b6 c54634c36912d38da9fbf6bbec6ffd4523b2c771 Axel chabrerie <114242486+Axel-ex@users.noreply.github.com> 1746222093 +0100	commit: looks like a final version
+c54634c36912d38da9fbf6bbec6ffd4523b2c771 a79bdc95f26fe4075556721d50059fcdcdb5cca0 Axel chabrerie <114242486+Axel-ex@users.noreply.github.com> 1746263295 +0100	commit: added battery reading publishing
+a79bdc95f26fe4075556721d50059fcdcdb5cca0 bb54ab38b395b77d165441d75e18777c14a5ef14 Axel chabrerie <114242486+Axel-ex@users.noreply.github.com> 1746311805 +0100	commit: added transition to low for pin transistor
+bb54ab38b395b77d165441d75e18777c14a5ef14 bb54ab38b395b77d165441d75e18777c14a5ef14 Axel chabrerie <114242486+Axel-ex@users.noreply.github.com> 1746314382 +0100	reset: moving to HEAD

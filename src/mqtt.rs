@@ -1,11 +1,13 @@
+use crate::{global::*, CONFIG};
 use anyhow::Result;
 use core::sync::atomic::Ordering;
+use embedded_dht_rs::SensorReading;
 use esp_idf_svc::{
     mqtt::client::*,
     wifi::{BlockingWifi, EspWifi},
 };
+use ina219::measurements::BusVoltage;
 use std::time::Duration;
-use weather_station::*;
 
 //MQTT
 pub fn mqtt_create() -> Result<(EspMqttClient<'static>, EspMqttConnection)> {
@@ -22,6 +24,7 @@ pub fn mqtt_create() -> Result<(EspMqttClient<'static>, EspMqttConnection)> {
     Ok((mqtt_client, mqtt_connection))
 }
 
+#[allow(unused)]
 pub fn publish_bme_data(mqtt_cli: &mut EspMqttClient, bme_readings: bosch_bme680::MeasurmentData) {
     let payload = format!(
         "{{\"temperature\": {}, \"humidity\": {}, \"pressure\": {}}}",
@@ -32,11 +35,29 @@ pub fn publish_bme_data(mqtt_cli: &mut EspMqttClient, bme_readings: bosch_bme680
     mqtt_cli
         .publish(
             bme_topic.as_str(),
-            QoS::ExactlyOnce,
+            QoS::AtLeastOnce,
             true,
             payload.as_bytes(),
         )
         .map_err(|e| log::error!("fail publishing bme data: {e}"))
+        .ok();
+}
+
+pub fn publish_dht_data(mqtt_cli: &mut EspMqttClient, dht_readings: SensorReading<f32>) {
+    let payload = format!(
+        "{{\"temperature\": {}, \"humidity\": {}, \"pressure\": {}}}",
+        dht_readings.temperature, dht_readings.humidity, 0
+    );
+    let bme_topic = format!("{}/bme680", CONFIG.topic);
+
+    mqtt_cli
+        .publish(
+            bme_topic.as_str(),
+            QoS::AtLeastOnce,
+            true,
+            payload.as_bytes(),
+        )
+        .map_err(|e| log::error!("fail publishing dht data: {e}"))
         .ok();
 }
 
@@ -46,21 +67,23 @@ pub fn publish_anemo_data(mqtt_cli: &mut EspMqttClient, wind_direction: String) 
     mqtt_cli
         .publish(
             anemo_topic.as_str(),
-            QoS::ExactlyOnce,
+            QoS::AtLeastOnce,
             true,
             wind_direction.as_bytes(),
         )
         .map_err(|e| log::error!("fail publishing anemo data: {e}"))
         .ok();
     //calculation with anemo dimension * 3.6 to have km/h
-    let wind_speed = (ROTATION_COUNT.load(Ordering::Relaxed) as f32) * 0.0173833 * 3.6;
+    let wind_speed = (ROTATION_COUNT.load(Ordering::Relaxed) as f32)
+        * (1.05 / CONFIG.active_duration_s as f32)
+        * 3.6;
     ROTATION_COUNT.store(0, Ordering::Relaxed);
     let topic = format!("{}/anemo/wind_speed", CONFIG.topic);
 
     mqtt_cli
         .publish(
             &topic,
-            QoS::ExactlyOnce,
+            QoS::AtLeastOnce,
             true,
             wind_speed.to_string().as_bytes(),
         )
@@ -78,7 +101,7 @@ pub fn publish_rain_data(mqtt_cli: &mut EspMqttClient) {
     mqtt_cli
         .publish(
             &topic,
-            QoS::ExactlyOnce,
+            QoS::AtLeastOnce,
             true,
             rain_quantity.to_string().as_bytes(),
         )
@@ -99,7 +122,7 @@ pub fn publish_wifi_data(mqtt_cli: &mut EspMqttClient, wifi: &mut BlockingWifi<E
                 mqtt_cli
                     .publish(
                         &topic,
-                        QoS::ExactlyOnce,
+                        QoS::AtLeastOnce,
                         true,
                         net.signal_strength.to_string().as_bytes(),
                     )
@@ -114,5 +137,13 @@ pub fn publish_wifi_data(mqtt_cli: &mut EspMqttClient, wifi: &mut BlockingWifi<E
         Err(e) => {
             log::warn!("Failed to scan WiFi networks: {:?}", e);
         }
+    }
+}
+
+pub fn publish_battery_readings(mqtt_cli: &mut EspMqttClient, battery_reading: BusVoltage) {
+    let topic = format!("{}/battery/voltage", CONFIG.topic);
+    let payload = format!("{}", battery_reading.voltage_mv());
+    if let Err(e) = mqtt_cli.publish(&topic, QoS::AtLeastOnce, true, payload.as_bytes()) {
+        log::error!("Fail publishing bus voltage {e}");
     }
 }

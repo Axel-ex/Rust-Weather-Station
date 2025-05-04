@@ -2,7 +2,7 @@
 
 The **Rust Weather Station** is a fully-featured weather monitoring system built using Rust and embedded hardware components. Designed to be reliable, this project leverages the power of Rust for embedded systems to gather real-time environmental data such as temperature, humidity, pressure, wind speed, wind direction, and rainfall. The gathered data is then published to an MQTT server, making it accessible for further use. 
 <div align="center">
-    <img src="demo.jpg" width="50%" />
+    <img src=".github/assets/demo.jpg" width="50%" />
 </div>
 
 ## Hardware

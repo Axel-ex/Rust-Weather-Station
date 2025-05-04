@@ -3,5 +3,5 @@
 /target
 /Cargo.lock
 cfg.toml
-.cargo
+.cargo/
 .DS_Store

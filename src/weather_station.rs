@@ -32,9 +32,8 @@ pub struct WeatherStation {
     pin_transistor: &'static mut PinDriver<'static, Gpio17, Output>,
     dht: Dht22<PinDriver<'static, Gpio32, InputOutput>, Delay>,
     as5600: As5600<i2c::RefCellDevice<'static, I2cDriver<'static>>>,
-    //battery_sensor: SyncIna219<RefCellDevice<'static, I2cDriver<'static>>, UnCalibrated>,
+    // battery_sensor: SyncIna219<RefCellDevice<'static, I2cDriver<'static>>, UnCalibrated>,
     wifi: BlockingWifi<EspWifi<'static>>,
-    start: Instant,
 }
 
 impl WeatherStation {
@@ -68,18 +67,15 @@ impl WeatherStation {
         let dht = Dht22::new(dht_pin, Delay::new(100));
 
         let as5600 = As5600::new(i2c::RefCellDevice::new(i2c_bus));
-        //let battery_sensor = SyncIna219::new(
-        //    i2c::RefCellDevice::new(i2c_bus),
-        //    Address::from_byte(0x40).unwrap(),
-        //)
-        //.expect("Fail creating Ina219 interface");
+        // let battery_sensor = SyncIna219::new(
+        //     i2c::RefCellDevice::new(i2c_bus),
+        //     Address::from_byte(0x40).unwrap(),
+        // )
+        // .expect("Fail creating Ina219 interface");
         //TODO: calibrate the ina
 
         let mut wifi = wifi_init(peripherals.modem).expect("Fail initiating wifi");
         connect_wifi(&mut wifi).expect("Fail connecting to nework");
-        let start = Instant::now();
-
-        //test i2c
 
         WeatherStation {
             pin_rain,
@@ -87,9 +83,8 @@ impl WeatherStation {
             pin_transistor,
             dht,
             as5600,
-            //battery_sensor,
+            // battery_sensor,
             wifi,
-            start,
         }
     }
 
@@ -128,7 +123,7 @@ impl WeatherStation {
                 })
                 .expect("An error occurred with mqtt client");
 
-            let active_duration = Duration::from_secs(CONFIG.active_duration_s + 1);
+            let active_duration = Duration::from_secs(CONFIG.active_duration_s);
             let start_time = Instant::now();
 
             info!("active duration: {:?}", active_duration);
@@ -136,41 +131,30 @@ impl WeatherStation {
                 self.check_rain_flag();
                 self.check_rotation_flag();
 
-                if self.check_time_passed() {
-                    let wind_direction = self.get_wind_direction();
-                    let dht_readings = self.get_dht_readings();
-                    //let bus_voltage = self.get_battery_readings();
-                    info!(
-                        "wind: {:?}, temp: {:?}, hum: {:?}",
-                        wind_direction, dht_readings.temperature, dht_readings.humidity
-                    );
-
-                    mqtt::publish_wifi_data(&mut mqtt_cli, &mut self.wifi);
-                    mqtt::publish_dht_data(&mut mqtt_cli, dht_readings);
-                    mqtt::publish_anemo_data(&mut mqtt_cli, wind_direction);
-                    //mqtt::publish_battery_readings(&mut mqtt_cli, bus_voltage);
-                    mqtt::publish_rain_data(&mut mqtt_cli);
-                }
-                FreeRtos::delay_ms(100);
+                FreeRtos::delay_ms(50);
             }
 
-            FreeRtos::delay_ms(3000);
+            let wind_direction = self.get_wind_direction();
+            let dht_readings = self.get_dht_readings();
+            // let bus_voltage = self.get_battery_readings();
+            info!(
+                "wind: {:?}, temp: {:?}, hum: {:?}",
+                wind_direction, dht_readings.temperature, dht_readings.humidity
+            );
+
+            mqtt::publish_wifi_data(&mut mqtt_cli, &mut self.wifi);
+            mqtt::publish_dht_data(&mut mqtt_cli, dht_readings);
+            mqtt::publish_anemo_data(&mut mqtt_cli, wind_direction);
+            // mqtt::publish_battery_readings(&mut mqtt_cli, bus_voltage);
+            mqtt::publish_rain_data(&mut mqtt_cli);
+            FreeRtos::delay_ms(5000);
+
             info!("Going to deep sleep...");
             self.pin_transistor.set_low().unwrap();
             unsafe {
                 esp_deep_sleep_start();
             }
         });
-    }
-
-    pub fn check_time_passed(&mut self) -> bool {
-        let now = Instant::now();
-
-        if now.duration_since(self.start) >= Duration::from_secs(CONFIG.active_duration_s) {
-            return true;
-        }
-
-        false
     }
 
     //Check if the flag was set to true, add to the global count and reset it. The function is needed
@@ -253,11 +237,11 @@ impl WeatherStation {
         direction.to_string()
     }
 
-    //pub fn get_battery_readings(&mut self) -> BusVoltage {
-    //    if let Ok(voltage) = self.battery_sensor.bus_voltage() {
-    //        return voltage;
-    //    } else {
-    //        BusVoltage::from_mv(0)
-    //    }
-    //}
+    // pub fn get_battery_readings(&mut self) -> BusVoltage {
+    //     if let Ok(voltage) = self.battery_sensor.bus_voltage() {
+    //         return voltage;
+    //     } else {
+    //         BusVoltage::from_mv(0)
+    //     }
+    // }
 }

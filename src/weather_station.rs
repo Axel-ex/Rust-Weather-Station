@@ -32,7 +32,7 @@ pub struct WeatherStation {
     pin_transistor: &'static mut PinDriver<'static, Gpio17, Output>,
     dht: Dht22<PinDriver<'static, Gpio32, InputOutput>, Delay>,
     as5600: As5600<i2c::RefCellDevice<'static, I2cDriver<'static>>>,
-    // battery_sensor: SyncIna219<RefCellDevice<'static, I2cDriver<'static>>, UnCalibrated>,
+    battery_sensor: SyncIna219<RefCellDevice<'static, I2cDriver<'static>>, UnCalibrated>,
     wifi: BlockingWifi<EspWifi<'static>>,
 }
 
@@ -67,11 +67,11 @@ impl WeatherStation {
         let dht = Dht22::new(dht_pin, Delay::new(100));
 
         let as5600 = As5600::new(i2c::RefCellDevice::new(i2c_bus));
-        // let battery_sensor = SyncIna219::new(
-        //     i2c::RefCellDevice::new(i2c_bus),
-        //     Address::from_byte(0x40).unwrap(),
-        // )
-        // .expect("Fail creating Ina219 interface");
+        let battery_sensor = SyncIna219::new(
+            i2c::RefCellDevice::new(i2c_bus),
+            Address::from_byte(0x40).unwrap(),
+        )
+        .expect("Fail creating Ina219 interface");
         //TODO: calibrate the ina
 
         let mut wifi = wifi_init(peripherals.modem).expect("Fail initiating wifi");
@@ -83,7 +83,7 @@ impl WeatherStation {
             pin_transistor,
             dht,
             as5600,
-            // battery_sensor,
+            battery_sensor,
             wifi,
         }
     }
@@ -136,7 +136,7 @@ impl WeatherStation {
 
             let wind_direction = self.get_wind_direction();
             let dht_readings = self.get_dht_readings();
-            // let bus_voltage = self.get_battery_readings();
+            let bus_voltage = self.get_battery_readings();
             info!(
                 "wind: {:?}, temp: {:?}, hum: {:?}",
                 wind_direction, dht_readings.temperature, dht_readings.humidity
@@ -145,7 +145,7 @@ impl WeatherStation {
             mqtt::publish_wifi_data(&mut mqtt_cli, &mut self.wifi);
             mqtt::publish_dht_data(&mut mqtt_cli, dht_readings);
             mqtt::publish_anemo_data(&mut mqtt_cli, wind_direction);
-            // mqtt::publish_battery_readings(&mut mqtt_cli, bus_voltage);
+            mqtt::publish_battery_readings(&mut mqtt_cli, bus_voltage);
             mqtt::publish_rain_data(&mut mqtt_cli);
             FreeRtos::delay_ms(5000);
 
@@ -223,25 +223,25 @@ impl WeatherStation {
 
         let angle = (reading as f32) * (360.0 / 4096.0);
         let direction = match angle {
-            angle if angle >= 0.0 && angle < 45.0 => "N",
-            angle if angle >= 45.0 && angle < 90.0 => "NE",
-            angle if angle >= 90.0 && angle < 135.0 => "E",
-            angle if angle >= 135.0 && angle < 180.0 => "SE",
-            angle if angle >= 180.0 && angle < 225.0 => "S",
-            angle if angle >= 225.0 && angle < 270.0 => "SW",
-            angle if angle >= 270.0 && angle < 315.0 => "W",
-            angle if angle >= 315.0 && angle < 360.0 => "NW",
+            0.0..45.0 => "N",
+            45.0..90.0 => "NE",
+            90.0..135.0 => "E",
+            135.0..180.0 => "SE",
+            180.0..225.0 => "S",
+            225.0..270.0 => "SW",
+            270.0..315.0 => "W",
+            315.0..360.0 => "NW",
             _ => "Invalid Angle",
         };
 
         direction.to_string()
     }
 
-    // pub fn get_battery_readings(&mut self) -> BusVoltage {
-    //     if let Ok(voltage) = self.battery_sensor.bus_voltage() {
-    //         return voltage;
-    //     } else {
-    //         BusVoltage::from_mv(0)
-    //     }
-    // }
+    pub fn get_battery_readings(&mut self) -> BusVoltage {
+        if let Ok(voltage) = self.battery_sensor.bus_voltage() {
+            voltage
+        } else {
+            BusVoltage::from_mv(0)
+        }
+    }
 }

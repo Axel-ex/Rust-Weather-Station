@@ -12,7 +12,7 @@ use std::time::Duration;
 //MQTT
 pub fn mqtt_create() -> Result<(EspMqttClient<'static>, EspMqttConnection)> {
     let (mqtt_client, mqtt_connection) = EspMqttClient::new(
-        &CONFIG.broker_url,
+        CONFIG.broker_url,
         &MqttClientConfiguration {
             client_id: Some(CONFIG.client_id),
             username: Some(CONFIG.mqtt_user),

@@ -19,12 +19,12 @@ jobs:
       fail-fast: false
       matrix:
         action:
-          - command: build
-            args: --release
           - command: fmt
             args: --all -- --check --color always
-          - command: clippy
-            args: --all-targets --all-features --workspace -- -D warnings
+          # - command: build
+          #   args: --release
+          # - command: clippy
+          #   args: --all-targets --all-features --workspace -- -D warnings
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

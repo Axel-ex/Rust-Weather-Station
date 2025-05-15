@@ -27,9 +27,9 @@ use std::cell::RefCell;
 use std::time::{Duration, Instant};
 
 pub struct WeatherStation {
-    pin_rain: &'static mut PinDriver<'static, Gpio25, Input>,
-    pin_anemo: &'static mut PinDriver<'static, Gpio27, Input>,
-    pin_transistor: &'static mut PinDriver<'static, Gpio17, Output>,
+    pin_rain: PinDriver<'static, Gpio25, Input>,
+    pin_anemo: PinDriver<'static, Gpio27, Input>,
+    pin_transistor: PinDriver<'static, Gpio17, Output>,
     dht: Dht22<PinDriver<'static, Gpio32, InputOutput>, Delay>,
     as5600: As5600<i2c::RefCellDevice<'static, I2cDriver<'static>>>,
     battery_sensor: SyncIna219<RefCellDevice<'static, I2cDriver<'static>>, UnCalibrated>,
@@ -50,13 +50,12 @@ impl WeatherStation {
         .expect("Failed to create I2C driver");
 
         // Create a static reference to the I2C driver
-        // SAFETY: We ensure the I2C driver and PinDrivers lives for the entire program duration
+        // SAFETY: We ensure the I2C driver lives for the entire program duration + interior
+        // mutability
         let i2c_bus = Box::leak(Box::new(RefCell::new(i2c_driver)));
-        let pin_anemo = Box::leak(Box::new(PinDriver::input(peripherals.pins.gpio27).unwrap()));
-        let pin_rain = Box::leak(Box::new(PinDriver::input(peripherals.pins.gpio25).unwrap()));
-        let pin_transistor = Box::leak(Box::new(
-            PinDriver::output(peripherals.pins.gpio17).unwrap(),
-        ));
+        let pin_anemo = PinDriver::input(peripherals.pins.gpio27).unwrap();
+        let pin_rain = PinDriver::input(peripherals.pins.gpio25).unwrap();
+        let mut pin_transistor = PinDriver::output(peripherals.pins.gpio17).unwrap();
 
         //Turn on the peripherals (they are physically connected to a transistor for battery saving
         //purpose)
@@ -159,7 +158,7 @@ impl WeatherStation {
 
     //Check if the flag was set to true, add to the global count and reset it. The function is needed
     //to be able to reactivate interrupt which are automatically disabled upon fireing once.
-    pub fn check_rain_flag(&mut self) {
+    fn check_rain_flag(&mut self) {
         if RAIN_FLAG.load(Ordering::Relaxed) {
             RAIN_COUNT.store(RAIN_COUNT.load(Ordering::Relaxed) + 1, Ordering::Relaxed);
             RAIN_FLAG.store(false, Ordering::Relaxed);
@@ -169,7 +168,7 @@ impl WeatherStation {
         }
     }
 
-    pub fn check_rotation_flag(&mut self) {
+    fn check_rotation_flag(&mut self) {
         if ROTATION_FLAG.load(Ordering::Relaxed) {
             ROTATION_COUNT.store(
                 ROTATION_COUNT.load(Ordering::Relaxed) + 1,
@@ -182,7 +181,7 @@ impl WeatherStation {
         }
     }
 
-    pub fn get_dht_readings(&mut self) -> SensorReading<f32> {
+    fn get_dht_readings(&mut self) -> SensorReading<f32> {
         log::info!("get dht readings");
         match self.dht.read() {
             Ok(readings) => readings,
@@ -197,7 +196,7 @@ impl WeatherStation {
     }
 
     #[allow(unused)]
-    pub fn get_bme_readings(bme: &mut Bme680<RefCellDevice<I2cDriver>, Ets>) -> MeasurmentData {
+    fn get_bme_readings(bme: &mut Bme680<RefCellDevice<I2cDriver>, Ets>) -> MeasurmentData {
         match bme.measure() {
             Ok(readings) => readings,
             Err(e) => {
@@ -212,7 +211,7 @@ impl WeatherStation {
         }
     }
 
-    pub fn get_wind_direction(&mut self) -> String {
+    fn get_wind_direction(&mut self) -> String {
         let reading = match self.as5600.angle() {
             Ok(value) => value,
             Err(_) => {
@@ -237,7 +236,7 @@ impl WeatherStation {
         direction.to_string()
     }
 
-    pub fn get_battery_readings(&mut self) -> BusVoltage {
+    fn get_battery_readings(&mut self) -> BusVoltage {
         if let Ok(voltage) = self.battery_sensor.bus_voltage() {
             voltage
         } else {

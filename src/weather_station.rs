@@ -1,3 +1,4 @@
+use crate::mqtt::publish_rain_data;
 use crate::{global::*, mqtt, wifi::*, CONFIG};
 use anyhow::Result;
 use as5600::As5600;
@@ -8,7 +9,10 @@ use embedded_dht_rs::SensorReading;
 use embedded_hal_bus::i2c;
 use embedded_hal_bus::i2c::*;
 use esp_idf_svc::hal::delay::Delay;
+use esp_idf_svc::hal::reset::WakeupReason;
 use esp_idf_svc::hal::{delay::Ets, gpio::*, i2c::I2cDriver};
+use esp_idf_svc::mqtt::client::EspMqttClient;
+use esp_idf_svc::sys::esp_sleep_get_wakeup_cause;
 use esp_idf_svc::wifi::{BlockingWifi, EspWifi};
 use esp_idf_svc::{
     hal::{
@@ -22,10 +26,11 @@ use esp_idf_svc::{
 };
 use ina219::measurements::BusVoltage;
 use ina219::{address::Address, calibration::UnCalibrated, SyncIna219};
-use log::info;
+use log::{error, info};
 use std::cell::RefCell;
 use std::time::{Duration, Instant};
 
+#[allow(dead_code)]
 pub struct WeatherStation {
     pin_rain: PinDriver<'static, Gpio25, Input>,
     pin_anemo: PinDriver<'static, Gpio27, Input>,
@@ -122,38 +127,57 @@ impl WeatherStation {
                 })
                 .expect("An error occurred with mqtt client");
 
-            let active_duration = Duration::from_secs(CONFIG.active_duration_s);
-            let start_time = Instant::now();
+            let wake_up_reason = unsafe { esp_sleep_get_wakeup_cause() };
+            let wake_up_reason = WakeupReason::from(wake_up_reason);
 
-            info!("active duration: {:?}", active_duration);
-            while start_time.elapsed() < active_duration {
-                self.check_rain_flag();
-                self.check_rotation_flag();
-
-                FreeRtos::delay_ms(50);
-            }
-
-            let wind_direction = self.get_wind_direction();
-            let dht_readings = self.get_dht_readings();
-            let bus_voltage = self.get_battery_readings();
-            info!(
-                "wind: {:?}, temp: {:?}, hum: {:?}",
-                wind_direction, dht_readings.temperature, dht_readings.humidity
-            );
-
-            mqtt::publish_wifi_data(&mut mqtt_cli, &mut self.wifi);
-            mqtt::publish_dht_data(&mut mqtt_cli, dht_readings);
-            mqtt::publish_anemo_data(&mut mqtt_cli, wind_direction);
-            mqtt::publish_battery_readings(&mut mqtt_cli, bus_voltage);
-            mqtt::publish_rain_data(&mut mqtt_cli);
-            FreeRtos::delay_ms(5000);
+            match wake_up_reason {
+                WakeupReason::Button => {
+                    info!("gpio wakeup!");
+                    self.handle_gpio_wakeup(&mut mqtt_cli);
+                }
+                reason => {
+                    info!("Wakeup reason {:?}!", reason);
+                    self.handle_timer_wakeup(&mut mqtt_cli);
+                }
+            };
 
             info!("Going to deep sleep...");
+            FreeRtos::delay_ms(3000);
             self.pin_transistor.set_low().unwrap();
             unsafe {
                 esp_deep_sleep_start();
             }
         });
+    }
+
+    fn handle_timer_wakeup(&mut self, mqtt_cli: &mut EspMqttClient<'static>) {
+        let active_duration = Duration::from_secs(CONFIG.active_duration_s);
+        let start_time = Instant::now();
+
+        while start_time.elapsed() < active_duration {
+            self.check_rain_flag();
+            self.check_rotation_flag();
+
+            FreeRtos::delay_ms(50);
+        }
+
+        let wind_direction = self.get_wind_direction();
+        let dht_readings = self.get_dht_readings();
+        let bus_voltage = self.get_battery_readings();
+        info!(
+            "wind: {:?}, temp: {:?}, hum: {:?}",
+            wind_direction, dht_readings.temperature, dht_readings.humidity
+        );
+
+        mqtt::publish_dht_data(mqtt_cli, dht_readings);
+        mqtt::publish_anemo_data(mqtt_cli, wind_direction);
+        mqtt::publish_battery_readings(mqtt_cli, bus_voltage);
+        mqtt::publish_rain_data(mqtt_cli);
+    }
+
+    fn handle_gpio_wakeup(&mut self, mqtt_cli: &mut EspMqttClient<'static>) {
+        RAIN_COUNT.fetch_add(1, Ordering::Relaxed);
+        publish_rain_data(mqtt_cli);
     }
 
     //Check if the flag was set to true, add to the global count and reset it. The function is needed
@@ -163,7 +187,7 @@ impl WeatherStation {
             RAIN_COUNT.store(RAIN_COUNT.load(Ordering::Relaxed) + 1, Ordering::Relaxed);
             RAIN_FLAG.store(false, Ordering::Relaxed);
             if let Err(e) = self.pin_rain.enable_interrupt() {
-                log::error!("Failed to re-enable rain interrupt: {e}");
+                error!("Failed to re-enable rain interrupt: {e}");
             }
         }
     }
@@ -176,7 +200,7 @@ impl WeatherStation {
             );
             ROTATION_FLAG.store(false, Ordering::Relaxed);
             if let Err(e) = self.pin_anemo.enable_interrupt() {
-                log::error!("Failed to re-enable anemo interrupt: {e}");
+                error!("Failed to re-enable anemo interrupt: {e}");
             }
         }
     }
@@ -186,7 +210,7 @@ impl WeatherStation {
         match self.dht.read() {
             Ok(readings) => readings,
             Err(e) => {
-                log::error!("Failed to get dht measurement: {:#?}", e);
+                error!("Failed to get dht measurement: {:#?}", e);
                 SensorReading {
                     humidity: 0f32,
                     temperature: 0f32,
@@ -200,7 +224,7 @@ impl WeatherStation {
         match bme.measure() {
             Ok(readings) => readings,
             Err(e) => {
-                log::error!("Failed to get BME readings: {:?}", e);
+                error!("Failed to get BME readings: {:?}", e);
                 MeasurmentData {
                     temperature: 0.0,
                     pressure: 0.0,
@@ -215,7 +239,7 @@ impl WeatherStation {
         let reading = match self.as5600.angle() {
             Ok(value) => value,
             Err(_) => {
-                log::error!("Couldn't read wind direction");
+                error!("Couldn't read wind direction");
                 return "NA".to_string();
             }
         };

@@ -2,10 +2,7 @@ use crate::{global::*, CONFIG};
 use anyhow::Result;
 use core::sync::atomic::Ordering;
 use embedded_dht_rs::SensorReading;
-use esp_idf_svc::{
-    mqtt::client::*,
-    wifi::{BlockingWifi, EspWifi},
-};
+use esp_idf_svc::mqtt::client::*;
 use ina219::measurements::BusVoltage;
 use std::time::Duration;
 
@@ -111,39 +108,29 @@ pub fn publish_rain_data(mqtt_cli: &mut EspMqttClient) {
         .ok();
 }
 
-pub fn publish_wifi_data(mqtt_cli: &mut EspMqttClient, wifi: &mut BlockingWifi<EspWifi>) {
-    let scan_result = wifi.wifi_mut().scan();
-    let topic = format!("{}/wifi", CONFIG.topic);
-
-    match scan_result {
-        Ok(access_points) => {
-            // Filter to find the access point with SSID "MEO-BD8310"
-            if let Some(net) = access_points.iter().find(|ap| ap.ssid == CONFIG.wifi_ssid) {
-                mqtt_cli
-                    .publish(
-                        &topic,
-                        QoS::AtLeastOnce,
-                        true,
-                        net.signal_strength.to_string().as_bytes(),
-                    )
-                    .map_err(|e| {
-                        log::error!("Fail publishing wifi data: {e}");
-                    })
-                    .ok();
-            } else {
-                log::warn!("{} not found.", CONFIG.wifi_ssid);
-            }
-        }
-        Err(e) => {
-            log::warn!("Failed to scan WiFi networks: {:?}", e);
-        }
-    }
-}
-
 pub fn publish_battery_readings(mqtt_cli: &mut EspMqttClient, battery_reading: BusVoltage) {
-    let topic = format!("{}/battery/voltage", CONFIG.topic);
-    let payload = format!("{}", battery_reading.voltage_mv());
-    if let Err(e) = mqtt_cli.publish(&topic, QoS::AtLeastOnce, true, payload.as_bytes()) {
+    let topic_voltage = format!("{}/battery/voltage", CONFIG.topic);
+    let topic_percentage = format!("{}/battery/percentage", CONFIG.topic);
+    let payload_mv = format!("{}", battery_reading.voltage_mv());
+    let payload_percentage = format!(
+        "{}",
+        (battery_reading.voltage_mv() as f32 - 3.6) / (4.1 - 3.6) * 100 as f32
+    );
+
+    if let Err(e) = mqtt_cli.publish(
+        &topic_voltage,
+        QoS::AtLeastOnce,
+        true,
+        payload_mv.as_bytes(),
+    ) {
         log::error!("Fail publishing bus voltage {e}");
+    }
+    if let Err(e) = mqtt_cli.publish(
+        &topic_percentage,
+        QoS::AtLeastOnce,
+        true,
+        payload_percentage.as_bytes(),
+    ) {
+        log::error!("Fail publishing battery percentage {e}");
     }
 }

@@ -41,6 +41,9 @@ pub fn publish_bme_data(mqtt_cli: &mut EspMqttClient, bme_readings: bosch_bme680
 }
 
 pub fn publish_dht_data(mqtt_cli: &mut EspMqttClient, dht_readings: SensorReading<f32>) {
+    if dht_readings.humidity == 0.0 && dht_readings.temperature == 0.0 {
+        return;
+    }
     let payload = format!(
         "{{\"temperature\": {}, \"humidity\": {}, \"pressure\": {}}}",
         dht_readings.temperature, dht_readings.humidity, 0
@@ -116,6 +119,7 @@ pub fn publish_battery_readings(mqtt_cli: &mut EspMqttClient, battery_reading: B
         "{}",
         (battery_reading.voltage_mv() as f32 - 3.6) / (4.1 - 3.6) * 100 as f32
     );
+    log::info!("Battery readings: {}", payload_mv);
 
     if let Err(e) = mqtt_cli.publish(
         &topic_voltage,

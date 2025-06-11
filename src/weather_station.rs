@@ -141,8 +141,8 @@ impl WeatherStation {
                 }
             };
 
-            info!("Going to deep sleep...");
             FreeRtos::delay_ms(3000);
+            info!("Going to deep sleep...");
             self.pin_transistor.set_low().unwrap();
             unsafe {
                 esp_deep_sleep_start();

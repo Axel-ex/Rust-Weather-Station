@@ -32,7 +32,7 @@ once_cell = "1.20.2"
 as5600 = "0.8.0"
 anyhow = "1.0.95"
 heapless = "0.8.0"
-embedded-dht-rs = { version = "0.4.0", features = ["dht22"] }
+embedded-dht-rs = { version = "0.5.0", features = ["dht22"] }
 dht-sensor = {git = "https://github.com/michaelbeaumont/dht-sensor.git", branch = "main" } 
 ina219 = "0.2.0"
 

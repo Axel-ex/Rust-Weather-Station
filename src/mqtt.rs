@@ -117,7 +117,7 @@ pub fn publish_battery_readings(mqtt_cli: &mut EspMqttClient, battery_reading: B
     let payload_mv = format!("{}", battery_reading.voltage_mv());
     let payload_percentage = format!(
         "{}",
-        (battery_reading.voltage_mv() as f32 - 3.6) / (4.1 - 3.6) * 100 as f32
+        (battery_reading.voltage_mv() as f32 / 1000 as f32 - 3.6) / (4.1 - 3.6) * 100 as f32
     );
     log::info!("Battery readings: {}", payload_mv);
 

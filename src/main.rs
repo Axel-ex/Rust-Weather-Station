@@ -30,7 +30,7 @@ pub struct Config {
 fn main() {
     esp_idf_svc::sys::link_patches();
     esp_idf_svc::log::EspLogger::initialize_default();
-    esp_idf_svc::log::set_target_level("*", log::LevelFilter::Debug).unwrap();
+    esp_idf_svc::log::set_target_level("*", log::LevelFilter::Off).unwrap();
 
     std::panic::set_hook(Box::new(|_info| {
         log::error!("Panic occured: rebooting...");

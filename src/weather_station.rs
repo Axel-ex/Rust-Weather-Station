@@ -1,4 +1,4 @@
-use crate::mqtt::publish_rain_data;
+use crate::mqtt::{publish_dht_data, publish_rain_data};
 use crate::{global::*, mqtt, wifi::*, CONFIG};
 use anyhow::Result;
 use as5600::As5600;
@@ -177,7 +177,9 @@ impl WeatherStation {
 
     fn handle_gpio_wakeup(&mut self, mqtt_cli: &mut EspMqttClient<'static>) {
         RAIN_COUNT.fetch_add(1, Ordering::Relaxed);
+        let dht_readings = self.get_dht_readings();
         publish_rain_data(mqtt_cli);
+        publish_dht_data(mqtt_cli, dht_readings);
     }
 
     //Check if the flag was set to true, add to the global count and reset it. The function is needed

@@ -7,25 +7,33 @@
 )]
 
 use core::future::pending;
+use embassy_net::{Config, StackResources};
 
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::clock::CpuClock;
 use esp_hal::gpio::Flex;
+use esp_hal::rng::Rng;
 use esp_hal::timer::timg::TimerGroup;
+use esp_radio::Controller;
 use log::info;
 
 pub mod tasks;
-use tasks::dht_task::dht_task;
-
 use crate::tasks::mqtt_task::MQTT_CHANNEL;
+use crate::tasks::wifi_task::{runner_task, wifi_task};
+use tasks::dht_task::dht_task;
 //TODO: call the reset from esp_idf_sys in the panic handler
 // #[panic_handler]
 // fn panic(_: &core::panic::PanicInfo) -> ! {
 //     loop {}
 // }
-
+macro_rules! mk_static {
+    ($t:ty, $val:expr) => {{
+        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
+        STATIC_CELL.init_with(|| $val)
+    }};
+}
 extern crate alloc;
 
 // This creates a default app-descriptor required by the esp-idf bootloader.
@@ -37,7 +45,6 @@ async fn main(spawner: Spawner) -> ! {
 
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
-
     esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 98767); // Why do we
                                                                                        // need to
                                                                                        // declare
@@ -47,17 +54,35 @@ async fn main(spawner: Spawner) -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
-    info!("Embassy initialized!");
+    // Init wifi
+    let radio_init = mk_static!(
+        Controller<'static>,
+        esp_radio::init().expect("Failed to initialize Wi-Fi/BLE controller")
+    );
 
-    let radio_init = esp_radio::init().expect("Failed to initialize Wi-Fi/BLE controller");
-    let (mut _wifi_controller, _interfaces) =
-        esp_radio::wifi::new(&radio_init, peripherals.WIFI, Default::default())
+    let (mut controller, interfaces) =
+        esp_radio::wifi::new(radio_init, peripherals.WIFI, Default::default())
             .expect("Failed to initialize Wi-Fi controller");
 
     //DHT_PIN
     let dht_pin = Flex::new(peripherals.GPIO32);
     let sender = MQTT_CHANNEL.sender();
 
+    let rng = Rng::new();
+    let seed = (rng.random() as u64) << 32 | rng.random() as u64;
+
+    // Init network stack
+    let (stack, runner) = embassy_net::new(
+        interfaces.sta,
+        Config::default(),
+        mk_static!(StackResources<3>, StackResources::<3>::new()),
+        seed,
+    );
+
+    spawner
+        .spawn(runner_task(runner))
+        .expect("Fail setting the net stack up");
+    spawner.spawn(wifi_task(controller)).ok();
     let _ = spawner.spawn(dht_task(dht_pin, sender));
     //TODO: spawn embassy_net runner, wifi task to reconnect in case of disconnection, mqtt client
     //listenig for input of the other tasks, dht task, anemo task (direction), wind speed and rain

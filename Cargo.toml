@@ -72,11 +72,11 @@ esp-backtrace = { version = "0.18.0", features = ["esp32", "println", "panic-han
 heapless = "0.9.1"
 rust-mqtt= { version = "0.3.0", default-features = false, features = ["no_std"]}
 dht-sensor = { git = "https://github.com/michaelbeaumont/dht-sensor.git", branch = "main", features = ["async"] }
-# toml-config = "0.4.0"
 ina219 = { version = "0.2.0", features = ["async"]}
 as5600 = { version = "0.8.0" , features = ["async"]}
 embedded-hal = "=1.0.0"
 embedded-hal-async = "=1.0.0"
+toml-cfg = "0.2.0"
 
 [profile.dev]
 # Rust debug is too slow.

@@ -62,5 +62,9 @@ This project is a weather station built with **Rust** and embedded hardware. It 
 
 ## 🧱 Resources
 
-You can download the 3D printable parts (STL files) here:  
+You can download the 3D printable parts (STL files) here:
 👉 [Printables - YAWS (Yet Another Weather Station)](https://www.printables.com/model/729382-yaws-yet-another-weather-station/files)
+
+### 🔄 Thread-to-thread queue example
+
+Check `examples/dht_mqtt_queue.rs` for a minimal snippet that shows how a DHT sampling task can push readings into a FreeRTOS queue that a dedicated MQTT publisher drains using `esp-idf-svc` primitives.

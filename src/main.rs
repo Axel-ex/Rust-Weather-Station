@@ -7,9 +7,9 @@
 )]
 
 use core::future::pending;
-use embassy_net::{Config, StackResources};
 
 use embassy_executor::Spawner;
+use embassy_net::{Config, Ipv4Address, Ipv4Cidr, StackResources, StaticConfigV4};
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::clock::CpuClock;
@@ -17,17 +17,23 @@ use esp_hal::gpio::Flex;
 use esp_hal::rng::Rng;
 use esp_hal::timer::timg::TimerGroup;
 use esp_radio::Controller;
+use heapless::Vec;
+
 use log::info;
 
+pub mod config;
 pub mod tasks;
-use crate::tasks::mqtt_task::MQTT_CHANNEL;
+
+use crate::tasks::mqtt_task::{mqtt_task, MQTT_CHANNEL};
 use crate::tasks::wifi_task::{runner_task, wifi_task};
 use tasks::dht_task::dht_task;
+
 //TODO: call the reset from esp_idf_sys in the panic handler
 // #[panic_handler]
 // fn panic(_: &core::panic::PanicInfo) -> ! {
 //     loop {}
 // }
+
 macro_rules! mk_static {
     ($t:ty, $val:expr) => {{
         static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
@@ -60,33 +66,39 @@ async fn main(spawner: Spawner) -> ! {
         esp_radio::init().expect("Failed to initialize Wi-Fi/BLE controller")
     );
 
-    let (mut controller, interfaces) =
+    let (controller, interfaces) =
         esp_radio::wifi::new(radio_init, peripherals.WIFI, Default::default())
             .expect("Failed to initialize Wi-Fi controller");
 
     //DHT_PIN
     let dht_pin = Flex::new(peripherals.GPIO32);
     let sender = MQTT_CHANNEL.sender();
+    let receiver = MQTT_CHANNEL.receiver();
 
     let rng = Rng::new();
     let seed = (rng.random() as u64) << 32 | rng.random() as u64;
 
-    // Init network stack
+    // Init network stack, configure static IP since DHCP doesnt seem to want to colaborate
+    let mut dns_servers: heapless::Vec<Ipv4Address, 3> = heapless::Vec::new();
+    dns_servers.push(Ipv4Address::new(192, 168, 1, 1)).unwrap();
+
+    let cfg = Config::ipv4_static(StaticConfigV4 {
+        address: Ipv4Cidr::new(Ipv4Address::new(192, 168, 1, 123), 24),
+        gateway: Some(Ipv4Address::new(192, 168, 1, 1)),
+        dns_servers,
+    });
+
     let (stack, runner) = embassy_net::new(
         interfaces.sta,
-        Config::default(),
-        mk_static!(StackResources<3>, StackResources::<3>::new()),
+        cfg,
+        mk_static!(StackResources<6>, StackResources::<6>::new()),
         seed,
     );
 
-    spawner
-        .spawn(runner_task(runner))
-        .expect("Fail setting the net stack up");
+    spawner.spawn(runner_task(runner)).ok();
     spawner.spawn(wifi_task(controller)).ok();
-    let _ = spawner.spawn(dht_task(dht_pin, sender));
-    //TODO: spawn embassy_net runner, wifi task to reconnect in case of disconnection, mqtt client
-    //listenig for input of the other tasks, dht task, anemo task (direction), wind speed and rain
-    //content. 1 channel to receive strings and publish them.
+    spawner.spawn(mqtt_task(stack, receiver)).unwrap();
+    spawner.spawn(dht_task(dht_pin, sender)).ok();
 
     loop {
         info!("Hello world!");

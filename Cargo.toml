@@ -27,7 +27,7 @@ esp-rtos = { version = "0.1.1", features = [
 ] }
 
 esp-bootloader-esp-idf = { version = "0.3.0", features = ["esp32"] }
-log =  "0.4.28"
+log = { version = "0.4.28", features = ["max_level_trace", "release_max_level_trace"] }
 
 embassy-net = { version = "0.7.0", features = [
   "dhcpv4",
@@ -35,6 +35,8 @@ embassy-net = { version = "0.7.0", features = [
   "medium-ethernet",
   "tcp",
   "udp",
+  "mdns",
+  "dns"
 ] }
 embedded-io = "0.7.1"
 embedded-io-async =  "0.7.0"
@@ -69,14 +71,15 @@ critical-section = "1.2.0"
 static_cell      = "2.1.1"
 embassy-sync = "0.7.2"
 esp-backtrace = { version = "0.18.0", features = ["esp32", "println", "panic-handler"]}
-heapless = "0.9.1"
-rust-mqtt= { version = "0.3.0", default-features = false, features = ["no_std"]}
+heapless = "0.8.0"
 dht-sensor = { git = "https://github.com/michaelbeaumont/dht-sensor.git", branch = "main", features = ["async"] }
 ina219 = { version = "0.2.0", features = ["async"]}
 as5600 = { version = "0.8.0" , features = ["async"]}
 embedded-hal = "=1.0.0"
 embedded-hal-async = "=1.0.0"
 toml-cfg = "0.2.0"
+rust-mqtt = { git = "https://github.com/obabec/rust-mqtt", branch = "main", default-features = false }
+
 
 [profile.dev]
 # Rust debug is too slow.

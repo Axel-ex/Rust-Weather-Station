@@ -1,17 +1,10 @@
+use crate::config::CONFIG;
 use embassy_net::Runner;
 use embassy_time::Timer;
 use esp_radio::wifi::{
     AccessPointConfig, ClientConfig, ModeConfig, WifiApState, WifiController, WifiDevice, WifiEvent,
 };
 use log::info;
-
-#[toml_cfg::toml_config]
-pub struct Config {
-    #[default("")]
-    ssid: &'static str,
-    #[default("")]
-    password: &'static str,
-}
 
 #[embassy_executor::task]
 pub async fn runner_task(mut runner: Runner<'static, WifiDevice<'static>>) {
@@ -20,11 +13,10 @@ pub async fn runner_task(mut runner: Runner<'static, WifiDevice<'static>>) {
 
 #[embassy_executor::task]
 pub async fn wifi_task(mut controller: WifiController<'static>) {
-    let client_config = ModeConfig::ApSta(
+    let client_config = ModeConfig::Client(
         ClientConfig::default()
             .with_ssid(CONFIG.ssid.into())
             .with_password(CONFIG.password.into()),
-        AccessPointConfig::default().with_ssid("esp-radio".into()),
     );
     controller.set_config(&client_config).unwrap();
 
@@ -48,6 +40,7 @@ pub async fn wifi_task(mut controller: WifiController<'static>) {
                 match controller.connect_async().await {
                     Ok(_) => {
                         // wait until we're no longer connected
+                        info!("STA connected!");
                         controller.wait_for_event(WifiEvent::StaDisconnected).await;
                         info!("STA disconnected");
                     }

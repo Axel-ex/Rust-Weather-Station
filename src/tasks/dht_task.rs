@@ -44,6 +44,6 @@ pub async fn dht_task(
                 error!("Fail reading DHT {e:?}");
             }
         }
-        Timer::after_secs(1).await;
+        Timer::after_secs(10).await;
     }
 }

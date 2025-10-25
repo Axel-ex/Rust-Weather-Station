@@ -1,0 +1,31 @@
+   Compiling esp-println v0.16.0
+   Compiling esp-backtrace v0.18.0
+   Compiling Weather-Station-Embassy v0.1.0 (/home/axch/code/rust/embedded/Rust-Weather-Station)
+warning: unused import: `Channel`
+ --> src/tasks/dht_task.rs:5:15
+  |
+5 |     channel::{Channel, Sender},
+  |               ^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `AccessPointConfig`
+ --> src/tasks/wifi_task.rs:5:5
+  |
+5 |     AccessPointConfig, ClientConfig, ModeConfig, WifiApState, WifiController, WifiDevice, WifiEvent,
+  |     ^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `mqtt_sender`
+  --> src/tasks/dht_task.rs:15:5
+   |
+15 |     mqtt_sender: Sender<
+   |     ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_mqtt_sender`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `mqtt_receiver`
+  --> src/tasks/mqtt_task.rs:29:5
+   |
+29 |     mqtt_receiver: Receiver<
+   |     ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_mqtt_receiver`
+

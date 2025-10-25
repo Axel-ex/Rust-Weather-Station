@@ -1,5 +1,7 @@
+use core::net::Ipv4Addr;
+
 use crate::config::CONFIG;
-use embassy_net::{tcp::TcpSocket, Stack};
+use embassy_net::{tcp::TcpSocket, IpAddress, Stack};
 use embassy_sync::{
     blocking_mutex::raw::CriticalSectionRawMutex,
     channel::{Channel, Receiver},
@@ -26,26 +28,26 @@ pub static MQTT_CHANNEL: Channel<
 #[embassy_executor::task]
 pub async fn mqtt_task(
     stack: Stack<'static>,
-    mqtt_receiver: Receiver<
+    _mqtt_receiver: Receiver<
         'static,
         CriticalSectionRawMutex,
         String<DEFAULT_STRING_SIZE>,
         CHANNEL_SIZE,
     >,
 ) {
-    info!("waiting for config");
-    match stack
-        .wait_config_up()
-        .with_timeout(Duration::from_secs(30))
-        .await
-    {
-        Ok(()) => info!("got config: {:?}", stack.config_v4()),
-        Err(_) => error!("wait_config_up() errored"),
-    }
-    if !stack.is_config_up() {
-        error!("No IP. Bailing.");
-        return;
-    }
+    // info!("waiting for config");
+    // match stack
+    //     .wait_config_up()
+    //     .with_timeout(Duration::from_secs(30))
+    //     .await
+    // {
+    //     Ok(()) => info!("got config: {:?}", stack.config_v4()),
+    //     Err(_) => error!("wait_config_up() errored"),
+    // }
+    // if !stack.is_config_up() {
+    //     error!("No IP. Bailing.");
+    //     return;
+    // }
 
     info!("Waiting for link");
     match stack
@@ -66,12 +68,21 @@ pub async fn mqtt_task(
     }
 
     // 2) Resolve broker (or skip DNS and hardcode IP)
-    let addrs = stack
-        .dns_query(CONFIG.broker_url, DnsQueryType::A)
-        .await
-        .unwrap();
+    info!("Resolving: {}", CONFIG.broker_url);
+    let addrs = match stack.dns_query(CONFIG.broker_url, DnsQueryType::A).await {
+        Ok(a) if !a.is_empty() => a,
+        Ok(_) => {
+            error!("DNS: no A records");
+            return;
+        }
+        Err(e) => {
+            error!("DNS failed: {e:?}");
+            return;
+        }
+    };
 
     let broker_ip = addrs.first().copied().unwrap(); // pick the first A record
+                                                     // let broker_ip = IpAddress::Ipv4(Ipv4Addr::new(54, 36, 178, 49));
     let broker = (broker_ip, 1883u16);
 
     // 3) Create a TCP socket

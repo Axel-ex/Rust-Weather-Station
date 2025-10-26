@@ -4,6 +4,8 @@ pub struct Config {
     ssid: &'static str,
     #[default("")]
     password: &'static str,
-    #[default("")]
+    #[default("test.mosquitto.org")]
     broker_url: &'static str,
+    #[default("weather_station")]
+    topic: &'static str,
 }

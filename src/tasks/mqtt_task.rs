@@ -1,3 +1,8 @@
+use alloc::format;
+use core::result::Result;
+use core::str::FromStr;
+use rust_mqtt::packet::v5::publish_packet::QualityOfService;
+
 use crate::config::CONFIG;
 use embassy_net::dns::DnsQueryType;
 use embassy_net::{tcp::TcpSocket, Stack};
@@ -5,113 +10,48 @@ use embassy_sync::{
     blocking_mutex::raw::CriticalSectionRawMutex,
     channel::{Channel, Receiver},
 };
-use embassy_time::{Duration, Timer, WithTimeout};
+use embassy_time::{Duration, TimeoutError, WithTimeout};
 use esp_hal::rng::Rng;
 use heapless::String;
-use log::{error, info};
-use rust_mqtt::{
-    client::{client::MqttClient, client_config::ClientConfig},
-    packet::v5::publish_packet::QualityOfService,
-};
+use log::{debug, error, info};
+use rust_mqtt::client::{client::MqttClient, client_config::ClientConfig};
 
+pub const SOCKET_TIMEOUT: u64 = 120;
 pub const BUFFER_SIZE: usize = 2048;
 pub const DEFAULT_STRING_SIZE: usize = 30;
+pub const PAYLOAD_SIZE: usize = 40;
+pub const TOPIC_SIZE: usize = 30;
 pub const CHANNEL_SIZE: usize = 5;
-pub static MQTT_CHANNEL: Channel<
-    CriticalSectionRawMutex,
-    String<DEFAULT_STRING_SIZE>,
-    CHANNEL_SIZE,
-> = Channel::new();
+pub static MQTT_CHANNEL: Channel<CriticalSectionRawMutex, MqttPacket, CHANNEL_SIZE> =
+    Channel::new();
 
-async fn try_connect(
-    stack: embassy_net::Stack<'static>,
-    addr: embassy_net::IpAddress,
-    port: u16,
-
-    label: &str,
-) {
-    let mut rx = [0; 1024];
-    let mut tx = [0; 1024];
-    let mut s = TcpSocket::new(stack, &mut rx, &mut tx);
-    s.set_timeout(Some(Duration::from_secs(5)));
-
-    match s.connect((addr, port)).await {
-        Ok(()) => log::info!("{}: CONNECT OK", label),
-        Err(e) => log::error!("{}: CONNECT ERR: {:?}", label, e),
-    }
+pub struct MqttPacket {
+    topic: String<TOPIC_SIZE>,
+    payload: String<PAYLOAD_SIZE>,
 }
 
-async fn tcp_probe(stack: embassy_net::Stack<'static>) {
-    use embassy_net::{IpAddress, Ipv4Address};
-
-    try_connect(
-        stack,
-        IpAddress::Ipv4(Ipv4Address::new(192, 168, 1, 1)),
-        443,
-        "gateway:443",
-    )
-    .await;
-    try_connect(
-        stack,
-        IpAddress::Ipv4(Ipv4Address::new(93, 184, 215, 14)),
-        80,
-        "example.com:80",
-    )
-    .await;
-    try_connect(
-        stack,
-        IpAddress::Ipv4(Ipv4Address::new(1, 1, 1, 1)),
-        53,
-        "1.1.1.1:53 (TCP)",
-    )
-    .await;
-    try_connect(
-        stack,
-        IpAddress::Ipv4(Ipv4Address::new(34, 223, 228, 31)),
-        1883,
-        "emqx:1883",
-    )
-    .await;
+impl MqttPacket {
+    pub fn new(topic: &str, payload: &str) -> Self {
+        let topic_string = String::from_str(topic).unwrap_or_default();
+        let payload_string = String::from_str(payload).unwrap_or_default();
+        MqttPacket {
+            topic: topic_string,
+            payload: payload_string,
+        }
+    }
 }
 
 #[embassy_executor::task]
 pub async fn mqtt_task(
     stack: Stack<'static>,
-    _mqtt_receiver: Receiver<
-        'static,
-        CriticalSectionRawMutex,
-        String<DEFAULT_STRING_SIZE>,
-        CHANNEL_SIZE,
-    >,
+    mqtt_receiver: Receiver<'static, CriticalSectionRawMutex, MqttPacket, CHANNEL_SIZE>,
 ) {
-    info!("waiting for config");
-    match stack
-        .wait_config_up()
-        .with_timeout(Duration::from_secs(30))
+    wait_for_stack(&stack)
         .await
-    {
-        Ok(()) => info!("got config: {:?}", stack.config_v4()),
-        Err(_) => error!("wait_config_up() errored"),
-    }
-    if !stack.is_config_up() {
-        error!("No IP. Bailing.");
-        return;
-    }
+        .inspect(|_| info!("Got config: {:?}", stack.config_v4()))
+        .unwrap(); // crash if the stack never gets up
 
-    info!("Waiting for link");
-    match stack
-        .wait_link_up()
-        .with_timeout(Duration::from_secs(30))
-        .await
-    {
-        Ok(()) => info!("link is up"),
-        Err(_) => {
-            error!("wait_link_up() timed out");
-            return;
-        }
-    }
-
-    // 2) Resolve broker (or skip DNS and hardcode IP)
+    //  Resolve broker
     info!("Resolving: {}", CONFIG.broker_url);
     let addrs = match stack.dns_query(CONFIG.broker_url, DnsQueryType::A).await {
         Ok(a) if !a.is_empty() => a,
@@ -121,27 +61,22 @@ pub async fn mqtt_task(
         }
         Err(e) => {
             error!("DNS failed: {e:?}");
-            info!("testing tcp connections");
-            tcp_probe(stack).await;
             return;
         }
     };
 
     let broker_ip = addrs.first().copied().unwrap(); // pick the first A record
-                                                     // let broker_ip = IpAddress::Ipv4(Ipv4Addr::new(54, 36, 178, 49));
     let broker = (broker_ip, 1883u16);
-    info!("Broker address: {:#?}", broker);
+    debug!("Broker address: {:#?}", broker);
 
-    // 3) Create a TCP socket
+    // Create a TCP socket
     let mut tcp_rx = [0; BUFFER_SIZE];
     let mut tcp_tx = [0; BUFFER_SIZE];
-
     let mut socket = TcpSocket::new(stack, &mut tcp_rx, &mut tcp_tx);
-    socket.set_timeout(Some(Duration::from_secs(10)));
-
-    // 4) Connect TCP
+    socket.set_timeout(Some(Duration::from_secs(SOCKET_TIMEOUT)));
     socket.connect(broker).await.unwrap();
 
+    // Create mqtt client
     let rng = Rng::new();
     let mut config: ClientConfig<'static, 16, Rng> =
         rust_mqtt::client::client_config::ClientConfig::new(
@@ -168,17 +103,34 @@ pub async fn mqtt_task(
         .await
         .expect("Couldnt connect to broker!");
 
-    if let Err(e) = client
-        .send_message(
-            "weather_station/test",
-            "Hello guyzzzzzzz".as_bytes(),
-            QualityOfService::QoS1,
-            true,
-        )
-        .await
-    {
-        error!("An error occured sending the message: {e}");
+    loop {
+        let received = mqtt_receiver.receive().await;
+        let topic = format!("{}/{}", CONFIG.topic, received.topic);
+        info!("topic: {}, payload: {}", topic, received.payload);
+
+        client
+            .send_message(
+                topic.as_str(),
+                received.payload.as_bytes(),
+                QualityOfService::QoS1,
+                true,
+            )
+            .await
+            .map_err(|e| error!("Error sending mqtt packet: {:?}", e))
+            .ok();
     }
-    info!("Message sent");
-    Timer::after_secs(2).await;
+}
+
+pub async fn wait_for_stack(stack: &Stack<'static>) -> Result<(), TimeoutError> {
+    stack
+        .wait_config_up()
+        .with_timeout(Duration::from_secs(30))
+        .await?;
+
+    stack
+        .wait_link_up()
+        .with_timeout(Duration::from_secs(30))
+        .await?;
+
+    Ok(())
 }

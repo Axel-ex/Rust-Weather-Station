@@ -28,12 +28,12 @@ pub async fn wifi_task(mut controller: WifiController<'static>) {
             Ok(()) => {
                 log::info!("STA connected");
                 controller.wait_for_event(WifiEvent::StaDisconnected).await;
-                log::info!("STA disconnected, retrying in 5s");
+                log::info!("STA disconnected, retrying");
             }
             Err(e) => {
-                log::info!("connect_async() failed: {e:?}. Retrying in 5s");
+                log::info!("connect_async() failed: {e:?}. Retrying");
             }
         }
-        embassy_time::Timer::after_millis(5000).await;
+        embassy_time::Timer::after_secs(1).await;
     }
 }

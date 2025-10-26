@@ -9,7 +9,7 @@
 use core::future::pending;
 
 use embassy_executor::Spawner;
-use embassy_net::{Config, Ipv4Address, Ipv4Cidr, StackResources, StaticConfigV4};
+use embassy_net::StackResources;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::clock::CpuClock;
@@ -70,8 +70,8 @@ async fn main(spawner: Spawner) -> ! {
             .expect("Failed to initialize Wi-Fi controller");
 
     //DHT_PIN
-    let _dht_pin = Flex::new(peripherals.GPIO32);
-    let _sender = MQTT_CHANNEL.sender();
+    let dht_pin = Flex::new(peripherals.GPIO32);
+    let sender = MQTT_CHANNEL.sender();
     let receiver = MQTT_CHANNEL.receiver();
 
     let rng = Rng::new();
@@ -87,7 +87,7 @@ async fn main(spawner: Spawner) -> ! {
     spawner.spawn(runner_task(runner)).ok();
     spawner.spawn(wifi_task(controller)).ok();
     spawner.spawn(mqtt_task(stack, receiver)).unwrap();
-    // spawner.spawn(dht_task(dht_pin, sender)).ok();
+    spawner.spawn(dht_task(dht_pin, sender)).ok();
 
     loop {
         info!("Hello world!");

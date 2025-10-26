@@ -1,10 +1,6 @@
 use crate::config::CONFIG;
 use embassy_net::Runner;
-use embassy_time::Timer;
-use esp_radio::wifi::{
-    AccessPointConfig, ClientConfig, ModeConfig, WifiApState, WifiController, WifiDevice, WifiEvent,
-};
-use log::info;
+use esp_radio::wifi::{ClientConfig, ModeConfig, WifiController, WifiDevice, WifiEvent};
 
 #[embassy_executor::task]
 pub async fn runner_task(mut runner: Runner<'static, WifiDevice<'static>>) {

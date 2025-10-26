@@ -17,7 +17,6 @@ use esp_hal::gpio::Flex;
 use esp_hal::rng::Rng;
 use esp_hal::timer::timg::TimerGroup;
 use esp_radio::Controller;
-use heapless::Vec;
 
 use log::info;
 
@@ -71,8 +70,8 @@ async fn main(spawner: Spawner) -> ! {
             .expect("Failed to initialize Wi-Fi controller");
 
     //DHT_PIN
-    let dht_pin = Flex::new(peripherals.GPIO32);
-    let sender = MQTT_CHANNEL.sender();
+    let _dht_pin = Flex::new(peripherals.GPIO32);
+    let _sender = MQTT_CHANNEL.sender();
     let receiver = MQTT_CHANNEL.receiver();
 
     let rng = Rng::new();
@@ -84,15 +83,15 @@ async fn main(spawner: Spawner) -> ! {
     dns_servers.push(Ipv4Address::new(1, 1, 1, 1)).unwrap(); // Cloudflare
     dns_servers.push(Ipv4Address::new(8, 8, 8, 8)).unwrap(); // Google
                                                              //
-    let cfg = Config::ipv4_static(StaticConfigV4 {
-        address: Ipv4Cidr::new(Ipv4Address::new(192, 168, 1, 123), 24),
-        gateway: Some(Ipv4Address::new(192, 168, 1, 1)),
-        dns_servers,
-    });
+                                                             // let cfg = Config::ipv4_static(StaticConfigV4 {
+                                                             //     address: Ipv4Cidr::new(Ipv4Address::new(192, 168, 1, 123), 24),
+                                                             //     gateway: Some(Ipv4Address::new(192, 168, 1, 1)),
+                                                             //     dns_servers,
+                                                             // });
 
     let (stack, runner) = embassy_net::new(
         interfaces.sta,
-        cfg,
+        embassy_net::Config::dhcpv4(Default::default()),
         mk_static!(StackResources<6>, StackResources::<6>::new()),
         seed,
     );
@@ -100,7 +99,7 @@ async fn main(spawner: Spawner) -> ! {
     spawner.spawn(runner_task(runner)).ok();
     spawner.spawn(wifi_task(controller)).ok();
     spawner.spawn(mqtt_task(stack, receiver)).unwrap();
-    spawner.spawn(dht_task(dht_pin, sender)).ok();
+    // spawner.spawn(dht_task(dht_pin, sender)).ok();
 
     loop {
         info!("Hello world!");

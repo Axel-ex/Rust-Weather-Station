@@ -36,8 +36,9 @@ embassy-net = { version = "0.7.0", features = [
   "tcp",
   "udp",
   "mdns",
-  "dns"
+  "dns",
 ] }
+
 embedded-io = "0.7.1"
 embedded-io-async =  "0.7.0"
 esp-alloc = "0.9.0"

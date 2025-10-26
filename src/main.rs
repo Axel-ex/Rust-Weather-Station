@@ -77,18 +77,6 @@ async fn main(spawner: Spawner) -> ! {
     let rng = Rng::new();
     let seed = (rng.random() as u64) << 32 | rng.random() as u64;
 
-    // // Init network stack, configure static IP since DHCP doesnt seem to want to colaborate
-    let mut dns_servers: heapless::Vec<Ipv4Address, 3> = heapless::Vec::new();
-    dns_servers.push(Ipv4Address::new(192, 168, 1, 1)).unwrap();
-    dns_servers.push(Ipv4Address::new(1, 1, 1, 1)).unwrap(); // Cloudflare
-    dns_servers.push(Ipv4Address::new(8, 8, 8, 8)).unwrap(); // Google
-                                                             //
-                                                             // let cfg = Config::ipv4_static(StaticConfigV4 {
-                                                             //     address: Ipv4Cidr::new(Ipv4Address::new(192, 168, 1, 123), 24),
-                                                             //     gateway: Some(Ipv4Address::new(192, 168, 1, 1)),
-                                                             //     dns_servers,
-                                                             // });
-
     let (stack, runner) = embassy_net::new(
         interfaces.sta,
         embassy_net::Config::dhcpv4(Default::default()),

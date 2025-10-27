@@ -25,6 +25,7 @@ pub const CHANNEL_SIZE: usize = 5;
 pub static MQTT_CHANNEL: Channel<CriticalSectionRawMutex, MqttPacket, CHANNEL_SIZE> =
     Channel::new();
 
+#[derive(Debug)]
 pub struct MqttPacket {
     topic: String<TOPIC_SIZE>,
     payload: String<PAYLOAD_SIZE>,

@@ -76,10 +76,13 @@ heapless = "0.8.0"
 dht-sensor = { git = "https://github.com/michaelbeaumont/dht-sensor.git", branch = "main", features = ["async"] }
 ina219 = { version = "0.2.0", features = ["async"]}
 as5600 = { version = "0.8.0" , features = ["async"]}
-embedded-hal = "=1.0.0"
-embedded-hal-async = "=1.0.0"
+# embedded-hal = "=1.0.0"
+# embedded-hal-async = "=1.0.0"
 toml-cfg = "0.2.0"
 rust-mqtt = { git = "https://github.com/obabec/rust-mqtt", branch = "main", default-features = false }
+embassy-embedded-hal = "0.5.0"
+embassy-futures = "0.1.2"
+# future-utils = { version = "0.12.1", default-features = false }
 
 
 [profile.dev]

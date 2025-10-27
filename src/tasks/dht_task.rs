@@ -26,7 +26,6 @@ pub async fn dht_task(
     dht_pin.set_high(); // release the bus (idle high via pull-up)
 
     //WARN: maybe while is err we keep trying
-    Timer::after_secs(30).await;
     match dht22_async::read(&mut delay, &mut dht_pin).await {
         Ok(reading) => {
             info!(

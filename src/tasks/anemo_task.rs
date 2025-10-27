@@ -9,7 +9,7 @@ use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Sender
 use embassy_time::{Duration, Instant, Ticker};
 use esp_hal::gpio::Input;
 use heapless::String;
-use log::{ info, debug }
+use log::{debug, info};
 
 use crate::{
     config::CONFIG,
@@ -45,7 +45,7 @@ pub async fn anemo_task(
         }
     }
 
-    debug!("Counted {} rotations!", rotations);
+    info!("Counted {} rotations!", rotations);
     let mut payload = String::<PAYLOAD_SIZE>::new();
     write!(&mut payload, "{}", caclulate_windspeed(rotations)).unwrap();
     let mut topic = String::<TOPIC_SIZE>::new();

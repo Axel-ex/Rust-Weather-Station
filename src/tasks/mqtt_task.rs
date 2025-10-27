@@ -1,6 +1,8 @@
 use alloc::format;
+use core::net::IpAddr;
 use core::result::Result;
 use core::str::FromStr;
+use embassy_net::IpAddress;
 use rust_mqtt::packet::v5::publish_packet::QualityOfService;
 
 use crate::config::CONFIG;
@@ -52,22 +54,10 @@ pub async fn mqtt_task(
         .inspect(|_| info!("Got config: {:?}", stack.config_v4()))
         .unwrap(); // crash if the stack never gets up
 
-    //  Resolve broker
-    info!("Resolving: {}", CONFIG.broker_url);
-    let addrs = match stack.dns_query(CONFIG.broker_url, DnsQueryType::A).await {
-        Ok(a) if !a.is_empty() => a,
-        Ok(_) => {
-            error!("DNS: no A records");
-            return;
-        }
-        Err(e) => {
-            error!("DNS failed: {e:?}");
-            return;
-        }
-    };
-
-    let broker_ip = addrs.first().copied().unwrap(); // pick the first A record
-    let broker = (broker_ip, 1883u16);
+    let broker = (
+        IpAddress::from_str(CONFIG.broker_ip).unwrap(),
+        CONFIG.broker_port,
+    );
     debug!("Broker address: {:#?}", broker);
 
     // Create a TCP socket
@@ -85,7 +75,9 @@ pub async fn mqtt_task(
             rng,
         );
     config.add_max_subscribe_qos(rust_mqtt::packet::v5::publish_packet::QualityOfService::QoS1);
-    config.add_client_id("weather_station");
+    config.add_client_id("esp_client");
+    config.add_username(CONFIG.mqtt_user);
+    config.add_password(CONFIG.mqtt_pass);
 
     let mut mqtt_rx = [0; BUFFER_SIZE];
     let mut mqtt_tx = [0; BUFFER_SIZE];

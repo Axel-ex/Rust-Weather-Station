@@ -13,13 +13,13 @@ pub async fn wifi_task(mut controller: WifiController<'static>) {
     let client_cfg = ModeConfig::Client(
         ClientConfig::default()
             .with_ssid(CONFIG.ssid.into())
-            .with_password(CONFIG.password.into()),
+            .with_password(CONFIG.wifi_pass.into()),
     );
 
     controller.set_config(&client_cfg).unwrap();
 
     log::info!("Starting WiFi (STA)...");
-    log::info!("Connecting to {} {}", CONFIG.ssid, CONFIG.password);
+    log::info!("Connecting to {} {}", CONFIG.ssid, CONFIG.wifi_pass);
 
     controller.start_async().await.unwrap();
 

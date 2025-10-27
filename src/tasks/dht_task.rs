@@ -31,13 +31,13 @@ pub async fn dht_task(
     //WARN: maybe while is err we keep trying
     match dht22_async::read(&mut delay, &mut dht_pin).await {
         Ok(reading) => {
-            debug!(
+            info!(
                 "Got {}C {}%",
                 reading.temperature, reading.relative_humidity
             );
-            let mut temp_topic = String::<TOPIC_SIZE>::new();
+            let mut dht_topic = String::<TOPIC_SIZE>::new();
             let mut hum_topic = String::<TOPIC_SIZE>::new();
-            write!(&mut temp_topic, "{}/temperature", CONFIG.topic).ok();
+            write!(&mut dht_topic, "{}/temperature", CONFIG.topic).ok();
             write!(&mut hum_topic, "{}/humidity", CONFIG.topic).ok();
 
             let mut temp_payload = String::<PAYLOAD_SIZE>::new();
@@ -45,7 +45,7 @@ pub async fn dht_task(
             write!(&mut temp_payload, "{}", reading.temperature).ok();
             write!(&mut hum_payload, "{}", reading.relative_humidity).ok();
 
-            let temp_packet = MqttPacket::new(&temp_topic, &temp_payload);
+            let temp_packet = MqttPacket::new(&dht_topic, &temp_payload);
             let hum_packet = MqttPacket::new(&hum_topic, &hum_payload);
             mqtt_sender.send(temp_packet).await;
             mqtt_sender.send(hum_packet).await;

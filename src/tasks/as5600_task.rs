@@ -16,9 +16,9 @@ use crate::{
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 
 use heapless::String;
-use log::{error, info};
+use log::{debug, error, info};
 
-const MEASUREMENT_FREQ: u64 = 5;
+const MEASUREMENT_FREQ: u64 = 2;
 const INVALID_ANGLE: f32 = 361.0;
 
 #[embassy_executor::task]
@@ -28,6 +28,7 @@ pub async fn as5600_task(
     >,
     mqtt_sender: Sender<'static, CriticalSectionRawMutex, MqttPacket, CHANNEL_SIZE>,
 ) {
+    info!("Starting as5600 task");
     let mut ticker = Ticker::every(Duration::from_secs(CONFIG.task_dur_secs));
     let mut nb_measurements: f32 = 1.0;
     let mut avg_angle: f32 = 0.0;

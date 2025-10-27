@@ -162,24 +162,18 @@ async fn main(spawner: Spawner) -> ! {
 
             let packet = MqttPacket::new(&topic, &payload);
             MQTT_CHANNEL.send(packet).await;
-            Timer::after_secs(2).await;
         }
         _ => {
             // timer wakeup,
             spawner.spawn(anemo_task(anemo_pin, sender_anemo)).ok();
             spawner.spawn(as5600_task(encoder, sender_as5600)).ok();
             // spawner.spawn(ina210_task(ina, sender_ina219)).ok();
-            pluvio_window(
-                &mut pluvio_p,
-                sender_pluvio,
-                Duration::from_secs(CONFIG.main_task_dur_secs),
-            )
-            .await;
+            Timer::after_secs(CONFIG.main_task_dur_secs).await;
         }
     }
 
     let ext0 = Ext0WakeupSource::new(pluvio_p, WakeupLevel::Low);
-    Timer::after_secs(2).await;
     info!("Going to sleep...");
+    Timer::after_secs(2).await;
     rtc.sleep_deep(&[&deep_sleep_timer, &ext0]);
 }

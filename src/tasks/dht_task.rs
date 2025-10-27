@@ -59,6 +59,6 @@ pub async fn dht_task(
             }
         }
         retry += 1;
-        Timer::after_secs(1);
+        Timer::after_secs(1).await;
     }
 }

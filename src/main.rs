@@ -6,15 +6,13 @@
     holding buffers for the duration of a data transfer."
 )]
 
-use core::fmt::Write as _;
-
 use as5600::asynch::As5600;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
 use embassy_net::StackResources;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::mutex::Mutex;
-use embassy_time::{Duration, Timer};
+use embassy_time::Timer;
 use esp_backtrace as _;
 use esp_hal::clock::CpuClock;
 use esp_hal::gpio::{Flex, Input, InputConfig, Output, OutputConfig};
@@ -27,23 +25,19 @@ use esp_hal::system::SleepSource;
 use esp_hal::timer::timg::TimerGroup;
 use esp_hal::{i2c, Async};
 use esp_radio::Controller;
-
-use heapless::String;
-use ina219::address::Address;
-use ina219::calibration::{IntCalibration, MicroAmpere};
-use ina219::AsyncIna219;
 use log::info;
 
 pub mod config;
 pub mod tasks;
+pub mod utils;
 
 use crate::config::CONFIG;
 use crate::tasks::anemo_task::anemo_task;
 use crate::tasks::as5600_task::as5600_task;
 use crate::tasks::ina219_task::ina210_task;
-use crate::tasks::mqtt_task::{mqtt_task, MqttPacket, DEFAULT_STRING_SIZE, MQTT_CHANNEL};
-use crate::tasks::pluvio_task::pluvio_window;
+use crate::tasks::mqtt_task::{mqtt_task, MQTT_CHANNEL};
 use crate::tasks::wifi_task::{runner_task, wifi_task};
+use crate::utils::{publish_rain, wait_for_stack};
 use tasks::dht_task::dht_task;
 
 //TODO: call the reset from esp_idf_sys in the panic handler
@@ -66,6 +60,7 @@ extern crate alloc;
 // This creates a default app-descriptor required by the esp-idf bootloader.
 esp_bootloader_esp_idf::esp_app_desc!();
 
+//TODO: move const in config
 #[esp_rtos::main]
 async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
@@ -100,12 +95,16 @@ async fn main(spawner: Spawner) -> ! {
     let receiver = MQTT_CHANNEL.receiver();
     spawner.spawn(runner_task(runner)).ok();
     spawner.spawn(wifi_task(controller)).ok();
+    wait_for_stack(&stack)
+        .await
+        .inspect(|_| info!("Got config: {:?}", stack.config_v4()))
+        .unwrap(); // crash if the stack never gets up
     spawner.spawn(mqtt_task(stack, receiver)).unwrap();
 
     //PERIPHERALS
     // PINS
     let dht_pin = Flex::new(peripherals.GPIO32);
-    let _transistor_pin = Output::new(
+    let mut transistor_pin = Output::new(
         peripherals.GPIO17,
         esp_hal::gpio::Level::High,
         OutputConfig::default(),
@@ -114,9 +113,8 @@ async fn main(spawner: Spawner) -> ! {
         peripherals.GPIO27,
         InputConfig::default().with_pull(esp_hal::gpio::Pull::Up),
     );
-    let mut pluvio_p = peripherals.GPIO25;
 
-    // I2C peripherals
+    // I2C bus
     let i2c_dev = I2c::new(peripherals.I2C0, i2c::master::Config::default())
         .unwrap()
         .with_sda(peripherals.GPIO21)
@@ -132,48 +130,27 @@ async fn main(spawner: Spawner) -> ! {
         I2cDevice::new(i2c_bus)
     );
 
-    let encoder = As5600::new(as_i2c);
-    let calib = IntCalibration::new(MicroAmpere(1_000_000), 1_000).unwrap();
-    // let ina = AsyncIna219::new_calibrated(ina_i2c, Address::from_byte(0x40).unwrap(), calib)
-    //     .await
-    //     .unwrap();
-
     let sender_dht = MQTT_CHANNEL.sender();
     let sender_anemo = MQTT_CHANNEL.sender();
-    let sender_pluvio = MQTT_CHANNEL.sender();
     let sender_as5600 = MQTT_CHANNEL.sender();
     let sender_ina219 = MQTT_CHANNEL.sender();
-
-    //TODO: register gpio wake up for pluvio
 
     let mut rtc = Rtc::new(peripherals.LPWR);
     let deep_sleep_timer =
         TimerWakeupSource::new(core::time::Duration::from_secs(CONFIG.deep_sleep_dur_secs));
+    let ext0 = Ext0WakeupSource::new(peripherals.GPIO25, WakeupLevel::Low);
 
-    spawner.spawn(dht_task(dht_pin, sender_dht)).ok();
-
-    match wakeup_cause() {
-        SleepSource::Ext0 => {
-            // gpio wakeup, just send temp and rain
-            let mut topic = String::<DEFAULT_STRING_SIZE>::new();
-            let mut payload = String::<DEFAULT_STRING_SIZE>::new();
-            write!(&mut topic, "{}/rain", CONFIG.topic).unwrap();
-            write!(&mut payload, "0.231").unwrap();
-
-            let packet = MqttPacket::new(&topic, &payload);
-            MQTT_CHANNEL.send(packet).await;
-        }
-        _ => {
-            // timer wakeup,
-            spawner.spawn(anemo_task(anemo_pin, sender_anemo)).ok();
-            spawner.spawn(as5600_task(encoder, sender_as5600)).ok();
-            // spawner.spawn(ina210_task(ina, sender_ina219)).ok();
-            Timer::after_secs(CONFIG.main_task_dur_secs).await;
-        }
+    if let SleepSource::Ext0 = wakeup_cause() {
+        publish_rain().await;
     }
+    spawner.spawn(dht_task(dht_pin, sender_dht)).ok();
+    spawner.spawn(anemo_task(anemo_pin, sender_anemo)).ok();
+    spawner.spawn(as5600_task(as_i2c, sender_as5600)).ok();
+    spawner.spawn(ina210_task(ina_i2c, sender_ina219)).ok();
+    Timer::after_secs(CONFIG.main_task_dur_secs).await;
 
-    let ext0 = Ext0WakeupSource::new(pluvio_p, WakeupLevel::Low);
     info!("Going to sleep...");
-    Timer::after_secs(2).await;
+    transistor_pin.set_low();
+    Timer::after_secs(1).await;
     rtc.sleep_deep(&[&deep_sleep_timer, &ext0]);
 }

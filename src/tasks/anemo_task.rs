@@ -9,11 +9,11 @@ use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Sender
 use embassy_time::{Duration, Instant, Ticker};
 use esp_hal::gpio::Input;
 use heapless::String;
-use log::{debug, info};
+use log::info;
 
 use crate::{
-    config::CONFIG,
-    tasks::mqtt_task::{MqttPacket, CHANNEL_SIZE, PAYLOAD_SIZE, TOPIC_SIZE},
+    config::{CHANNEL_SIZE, CONFIG, PAYLOAD_SIZE, TOPIC_SIZE},
+    tasks::mqtt_task::MqttPacket,
 };
 
 const DEBOUNCE: Duration = Duration::from_millis(5);

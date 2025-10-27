@@ -23,3 +23,10 @@ pub struct Config {
     #[default(60)]
     task_dur_secs: u64,
 }
+
+pub const SOCKET_TIMEOUT: u64 = 120;
+pub const BUFFER_SIZE: usize = 2048;
+pub const DEFAULT_STRING_SIZE: usize = 70;
+pub const PAYLOAD_SIZE: usize = 20;
+pub const TOPIC_SIZE: usize = 70;
+pub const CHANNEL_SIZE: usize = 5;

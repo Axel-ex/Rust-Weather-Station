@@ -5,25 +5,21 @@ use core::str::FromStr;
 use embassy_net::IpAddress;
 use rust_mqtt::packet::v5::publish_packet::QualityOfService;
 
-use crate::config::CONFIG;
-use embassy_net::dns::DnsQueryType;
+use crate::config::{
+    BUFFER_SIZE, CHANNEL_SIZE, CONFIG, DEFAULT_STRING_SIZE, PAYLOAD_SIZE, SOCKET_TIMEOUT,
+    TOPIC_SIZE,
+};
 use embassy_net::{tcp::TcpSocket, Stack};
 use embassy_sync::{
     blocking_mutex::raw::CriticalSectionRawMutex,
     channel::{Channel, Receiver},
 };
-use embassy_time::{Duration, TimeoutError, WithTimeout};
+use embassy_time::{Duration, Timer};
 use esp_hal::rng::Rng;
 use heapless::String;
 use log::{debug, error, info};
 use rust_mqtt::client::{client::MqttClient, client_config::ClientConfig};
 
-pub const SOCKET_TIMEOUT: u64 = 120;
-pub const BUFFER_SIZE: usize = 2048;
-pub const DEFAULT_STRING_SIZE: usize = 70;
-pub const PAYLOAD_SIZE: usize = 20;
-pub const TOPIC_SIZE: usize = 70;
-pub const CHANNEL_SIZE: usize = 5;
 pub static MQTT_CHANNEL: Channel<CriticalSectionRawMutex, MqttPacket, CHANNEL_SIZE> =
     Channel::new();
 
@@ -49,11 +45,6 @@ pub async fn mqtt_task(
     stack: Stack<'static>,
     mqtt_receiver: Receiver<'static, CriticalSectionRawMutex, MqttPacket, CHANNEL_SIZE>,
 ) {
-    wait_for_stack(&stack)
-        .await
-        .inspect(|_| info!("Got config: {:?}", stack.config_v4()))
-        .unwrap(); // crash if the stack never gets up
-
     let broker = (
         IpAddress::from_str(CONFIG.broker_ip).unwrap(),
         CONFIG.broker_port,
@@ -110,19 +101,6 @@ pub async fn mqtt_task(
             .await
             .map_err(|e| error!("Error sending mqtt packet: {:?}", e))
             .ok();
+        Timer::after_millis(500).await;
     }
-}
-
-pub async fn wait_for_stack(stack: &Stack<'static>) -> Result<(), TimeoutError> {
-    stack
-        .wait_config_up()
-        .with_timeout(Duration::from_secs(30))
-        .await?;
-
-    stack
-        .wait_link_up()
-        .with_timeout(Duration::from_secs(30))
-        .await?;
-
-    Ok(())
 }

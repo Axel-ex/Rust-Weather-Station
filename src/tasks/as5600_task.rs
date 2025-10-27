@@ -10,24 +10,24 @@ use esp_hal::i2c::master::I2c;
 use esp_hal::Async;
 
 use crate::{
-    config::CONFIG,
-    tasks::mqtt_task::{MqttPacket, CHANNEL_SIZE, DEFAULT_STRING_SIZE},
+    config::{CHANNEL_SIZE, CONFIG, DEFAULT_STRING_SIZE},
+    tasks::mqtt_task::MqttPacket,
 };
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 
 use heapless::String;
-use log::{debug, error, info};
+use log::{error, info};
 
 const MEASUREMENT_FREQ: u64 = 2;
 const INVALID_ANGLE: f32 = 361.0;
 
 #[embassy_executor::task]
 pub async fn as5600_task(
-    mut encoder: As5600<
-        &'static mut I2cDevice<'static, CriticalSectionRawMutex, I2c<'static, Async>>,
-    >,
+    i2c: &'static mut I2cDevice<'static, CriticalSectionRawMutex, I2c<'static, Async>>,
     mqtt_sender: Sender<'static, CriticalSectionRawMutex, MqttPacket, CHANNEL_SIZE>,
 ) {
+    let mut encoder = As5600::new(i2c);
+
     info!("Starting as5600 task");
     let mut ticker = Ticker::every(Duration::from_secs(CONFIG.task_dur_secs));
     let mut nb_measurements: f32 = 1.0;

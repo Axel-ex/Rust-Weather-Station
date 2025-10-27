@@ -16,7 +16,7 @@ use crate::{
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 
 use heapless::String;
-use log::error;
+use log::{error, info};
 
 const MEASUREMENT_FREQ: u64 = 5;
 const INVALID_ANGLE: f32 = 361.0;
@@ -50,6 +50,7 @@ pub async fn as5600_task(
         }
     }
 
+    info!("measured angle {}", avg_angle);
     let mut payload = String::<DEFAULT_STRING_SIZE>::new();
     write!(&mut payload, "{}", match_direction(avg_angle)).unwrap();
     let mut topic = String::<DEFAULT_STRING_SIZE>::new();

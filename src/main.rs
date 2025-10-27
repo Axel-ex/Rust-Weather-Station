@@ -32,6 +32,7 @@ use heapless::String;
 use ina219::address::Address;
 use ina219::calibration::{IntCalibration, MicroAmpere};
 use ina219::AsyncIna219;
+use log::info;
 
 pub mod config;
 pub mod tasks;
@@ -96,6 +97,10 @@ async fn main(spawner: Spawner) -> ! {
         mk_static!(StackResources<6>, StackResources::<6>::new()),
         seed,
     );
+    let receiver = MQTT_CHANNEL.receiver();
+    spawner.spawn(runner_task(runner)).ok();
+    spawner.spawn(wifi_task(controller)).ok();
+    spawner.spawn(mqtt_task(stack, receiver)).unwrap();
 
     //PERIPHERALS
     // PINS
@@ -105,9 +110,11 @@ async fn main(spawner: Spawner) -> ! {
         esp_hal::gpio::Level::High,
         OutputConfig::default(),
     );
-    let anemo_pin = Input::new(peripherals.GPIO27, InputConfig::default());
+    let anemo_pin = Input::new(
+        peripherals.GPIO27,
+        InputConfig::default().with_pull(esp_hal::gpio::Pull::Up),
+    );
     let mut pluvio_p = peripherals.GPIO25;
-    let pluvio_pin = Input::new(pluvio_p.reborrow(), InputConfig::default());
 
     // I2C peripherals
     let i2c_dev = I2c::new(peripherals.I2C0, i2c::master::Config::default())
@@ -127,16 +134,15 @@ async fn main(spawner: Spawner) -> ! {
 
     let encoder = As5600::new(as_i2c);
     let calib = IntCalibration::new(MicroAmpere(1_000_000), 1_000).unwrap();
-    let ina = AsyncIna219::new_calibrated(ina_i2c, Address::from_byte(0x40).unwrap(), calib)
-        .await
-        .unwrap();
+    // let ina = AsyncIna219::new_calibrated(ina_i2c, Address::from_byte(0x40).unwrap(), calib)
+    //     .await
+    //     .unwrap();
 
     let sender_dht = MQTT_CHANNEL.sender();
     let sender_anemo = MQTT_CHANNEL.sender();
     let sender_pluvio = MQTT_CHANNEL.sender();
     let sender_as5600 = MQTT_CHANNEL.sender();
     let sender_ina219 = MQTT_CHANNEL.sender();
-    let receiver = MQTT_CHANNEL.receiver();
 
     //TODO: register gpio wake up for pluvio
 
@@ -144,13 +150,11 @@ async fn main(spawner: Spawner) -> ! {
     let deep_sleep_timer =
         TimerWakeupSource::new(core::time::Duration::from_secs(CONFIG.deep_sleep_dur_secs));
 
-    spawner.spawn(runner_task(runner)).ok();
-    spawner.spawn(wifi_task(controller)).ok();
-    spawner.spawn(mqtt_task(stack, receiver)).unwrap();
     spawner.spawn(dht_task(dht_pin, sender_dht)).ok();
 
     match wakeup_cause() {
         SleepSource::Ext0 => {
+            // gpio wakeup, just send temp and rain
             let mut topic = String::<DEFAULT_STRING_SIZE>::new();
             let mut payload = String::<DEFAULT_STRING_SIZE>::new();
             write!(&mut topic, "{}/rain", CONFIG.topic).unwrap();
@@ -161,19 +165,21 @@ async fn main(spawner: Spawner) -> ! {
             Timer::after_secs(2).await;
         }
         _ => {
+            // timer wakeup,
             spawner.spawn(anemo_task(anemo_pin, sender_anemo)).ok();
             spawner.spawn(as5600_task(encoder, sender_as5600)).ok();
-            spawner.spawn(ina210_task(ina, sender_ina219)).ok();
+            // spawner.spawn(ina210_task(ina, sender_ina219)).ok();
             pluvio_window(
                 &mut pluvio_p,
                 sender_pluvio,
                 Duration::from_secs(CONFIG.main_task_dur_secs),
             )
             .await;
-            Timer::after(Duration::from_secs(CONFIG.main_task_dur_secs)).await;
         }
     }
 
     let ext0 = Ext0WakeupSource::new(pluvio_p, WakeupLevel::Low);
+    Timer::after_secs(2).await;
+    info!("Going to sleep...");
     rtc.sleep_deep(&[&deep_sleep_timer, &ext0]);
 }

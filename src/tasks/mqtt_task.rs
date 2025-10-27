@@ -18,9 +18,9 @@ use rust_mqtt::client::{client::MqttClient, client_config::ClientConfig};
 
 pub const SOCKET_TIMEOUT: u64 = 120;
 pub const BUFFER_SIZE: usize = 2048;
-pub const DEFAULT_STRING_SIZE: usize = 30;
-pub const PAYLOAD_SIZE: usize = 40;
-pub const TOPIC_SIZE: usize = 30;
+pub const DEFAULT_STRING_SIZE: usize = 70;
+pub const PAYLOAD_SIZE: usize = 20;
+pub const TOPIC_SIZE: usize = 70;
 pub const CHANNEL_SIZE: usize = 5;
 pub static MQTT_CHANNEL: Channel<CriticalSectionRawMutex, MqttPacket, CHANNEL_SIZE> =
     Channel::new();
@@ -106,12 +106,11 @@ pub async fn mqtt_task(
 
     loop {
         let received = mqtt_receiver.receive().await;
-        let topic = format!("{}/{}", CONFIG.topic, received.topic);
-        info!("topic: {}, payload: {}", topic, received.payload);
+        info!("topic: {}, payload: {}", received.topic, received.payload);
 
         client
             .send_message(
-                topic.as_str(),
+                received.topic.as_str(),
                 received.payload.as_bytes(),
                 QualityOfService::QoS1,
                 true,

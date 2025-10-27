@@ -1,4 +1,5 @@
 use crate::tasks::mqtt_task::{MqttPacket, CHANNEL_SIZE};
+use embassy_futures::select::{select, Either};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Sender};
 use embassy_time::{Duration, Instant, Timer};
 use esp_hal::gpio::{Input, InputConfig, Pull};
@@ -26,20 +27,15 @@ pub async fn pluvio_window(
         }
         // Wait until either an edge or the deadline (cheap timeout)
         let remaining = deadline - now;
-        match embassy_futures::select::select(
-            in_pin.wait_for_rising_edge(),
-            Timer::after(remaining),
-        )
-        .await
-        {
-            embassy_futures::select::Either::First(()) => {
+        match select(in_pin.wait_for_rising_edge(), Timer::after(remaining)).await {
+            Either::First(()) => {
                 let t = Instant::now();
                 if t.duration_since(last) >= DEBOUNCE {
                     pulses += 1;
                     last = t;
                 }
             }
-            embassy_futures::select::Either::Second(()) => break,
+            Either::Second(()) => break,
         }
     }
 
@@ -50,4 +46,3 @@ pub async fn pluvio_window(
     let pkt = MqttPacket::new("pluvio", &payload);
     mqtt_sender.send(pkt).await;
 }
-

@@ -31,7 +31,7 @@ log = { version = "0.4.28", features = ["max_level_trace", "release_max_level_tr
 
 embassy-net = { version = "0.7.0", features = [
   "dhcpv4",
-  "log",
+  # "log",
   "medium-ethernet",
   "tcp",
   "udp",
@@ -55,7 +55,7 @@ esp-radio = { version = "0.16.0", features = [
   "wifi",
 ] }
 smoltcp = { version = "0.12.0", default-features = false, features = [
-  "log",
+  # "log",
   "medium-ethernet",
   "multicast",
   "proto-dhcpv4",
@@ -76,13 +76,10 @@ heapless = "0.8.0"
 dht-sensor = { git = "https://github.com/michaelbeaumont/dht-sensor.git", branch = "main", features = ["async"] }
 ina219 = { version = "0.2.0", features = ["async"]}
 as5600 = { version = "0.8.0" , features = ["async"]}
-# embedded-hal = "=1.0.0"
-# embedded-hal-async = "=1.0.0"
 toml-cfg = "0.2.0"
 rust-mqtt = { git = "https://github.com/obabec/rust-mqtt", branch = "main", default-features = false }
 embassy-embedded-hal = "0.5.0"
 embassy-futures = "0.1.2"
-# future-utils = { version = "0.12.1", default-features = false }
 
 
 [profile.dev]

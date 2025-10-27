@@ -1,14 +1,9 @@
-use alloc::format;
-use core::net::IpAddr;
-use core::result::Result;
 use core::str::FromStr;
 use embassy_net::IpAddress;
 use rust_mqtt::packet::v5::publish_packet::QualityOfService;
 
-use crate::config::{
-    BUFFER_SIZE, CHANNEL_SIZE, CONFIG, DEFAULT_STRING_SIZE, PAYLOAD_SIZE, SOCKET_TIMEOUT,
-    TOPIC_SIZE,
-};
+use crate::config::BUFFER_SIZE;
+use crate::config::{CHANNEL_SIZE, CONFIG, PAYLOAD_SIZE, SOCKET_TIMEOUT, TOPIC_SIZE};
 use embassy_net::{tcp::TcpSocket, Stack};
 use embassy_sync::{
     blocking_mutex::raw::CriticalSectionRawMutex,
@@ -30,12 +25,10 @@ pub struct MqttPacket {
 }
 
 impl MqttPacket {
-    pub fn new(topic: &str, payload: &str) -> Self {
-        let topic_string = String::from_str(topic).unwrap_or_default();
-        let payload_string = String::from_str(payload).unwrap_or_default();
+    pub fn new(topic: String<TOPIC_SIZE>, payload: String<PAYLOAD_SIZE>) -> Self {
         MqttPacket {
-            topic: topic_string,
-            payload: payload_string,
+            topic: topic,
+            payload: payload,
         }
     }
 }

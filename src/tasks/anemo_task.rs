@@ -3,16 +3,13 @@
 //! calulate the rotations of the anemo and publish it.
 //!
 //! More details about this module.
-use core::fmt::Write as _;
 use embassy_futures::select::{select, Either};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Sender};
 use embassy_time::{Duration, Instant, Ticker};
 use esp_hal::gpio::Input;
-use heapless::String;
-use log::info;
 
 use crate::{
-    config::{CHANNEL_SIZE, CONFIG, PAYLOAD_SIZE, TOPIC_SIZE},
+    config::{CHANNEL_SIZE, CONFIG},
     tasks::mqtt_task::MqttPacket,
 };
 
@@ -44,17 +41,13 @@ pub async fn anemo_task(
             }
         }
     }
-
-    info!("Counted {} rotations!", rotations);
-    let mut payload = String::<PAYLOAD_SIZE>::new();
-    write!(&mut payload, "{}", caclulate_windspeed(rotations)).unwrap();
-    let mut topic = String::<TOPIC_SIZE>::new();
-    write!(&mut topic, "{}/anemo/wind_speed", CONFIG.topic).unwrap();
-    let packet = MqttPacket::new(&topic, &payload);
-
-    mqtt_sender.send(packet).await;
+    publish!(
+        &mqtt_sender,
+        "anemo/wind_speed",
+        caclulate_windspeed(rotations)
+    );
 }
 
 fn caclulate_windspeed(rotations: u64) -> f32 {
-    rotations as f32 * (1.05 / CONFIG.task_dur_secs as f32) * 3.6
+    rotations as f32 * (1.05 / CONFIG.task_dur_secs as f32) * 3.6 * 5.0
 }

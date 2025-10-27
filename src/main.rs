@@ -6,14 +6,12 @@
     holding buffers for the duration of a data transfer."
 )]
 
-use as5600::asynch::As5600;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
 use embassy_net::StackResources;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::mutex::Mutex;
 use embassy_time::Timer;
-use esp_backtrace as _;
 use esp_hal::clock::CpuClock;
 use esp_hal::gpio::{Flex, Input, InputConfig, Output, OutputConfig};
 use esp_hal::i2c::master::I2c;
@@ -21,15 +19,16 @@ use esp_hal::rng::Rng;
 use esp_hal::rtc_cntl::sleep::TimerWakeupSource;
 use esp_hal::rtc_cntl::sleep::{Ext0WakeupSource, WakeupLevel};
 use esp_hal::rtc_cntl::{wakeup_cause, Rtc};
-use esp_hal::system::SleepSource;
+use esp_hal::system::{software_reset, SleepSource};
 use esp_hal::timer::timg::TimerGroup;
 use esp_hal::{i2c, Async};
 use esp_radio::Controller;
 use log::info;
 
+#[macro_use]
+pub mod utils;
 pub mod config;
 pub mod tasks;
-pub mod utils;
 
 use crate::config::CONFIG;
 use crate::tasks::anemo_task::anemo_task;
@@ -37,14 +36,14 @@ use crate::tasks::as5600_task::as5600_task;
 use crate::tasks::ina219_task::ina210_task;
 use crate::tasks::mqtt_task::{mqtt_task, MQTT_CHANNEL};
 use crate::tasks::wifi_task::{runner_task, wifi_task};
-use crate::utils::{publish_rain, wait_for_stack};
+use crate::utils::wait_for_stack;
 use tasks::dht_task::dht_task;
 
-//TODO: call the reset from esp_idf_sys in the panic handler
-// #[panic_handler]
-// fn panic(_: &core::panic::PanicInfo) -> ! {
-//     loop {}
-// }
+// use esp_backtrace as _;
+#[panic_handler]
+fn panic(_: &core::panic::PanicInfo) -> ! {
+    software_reset();
+}
 
 //I2c
 type BusI2C = I2c<'static, Async>;
@@ -141,7 +140,7 @@ async fn main(spawner: Spawner) -> ! {
     let ext0 = Ext0WakeupSource::new(peripherals.GPIO25, WakeupLevel::Low);
 
     if let SleepSource::Ext0 = wakeup_cause() {
-        publish_rain().await;
+        publish!(&MQTT_CHANNEL.sender(), "rain", "0.231");
     }
     spawner.spawn(dht_task(dht_pin, sender_dht)).ok();
     spawner.spawn(anemo_task(anemo_pin, sender_anemo)).ok();

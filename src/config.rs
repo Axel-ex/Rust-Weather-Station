@@ -24,6 +24,7 @@ pub struct Config {
     task_dur_secs: u64,
 }
 
+pub const MAX_RETRY: i32 = 5;
 pub const SOCKET_TIMEOUT: u64 = 120;
 pub const BUFFER_SIZE: usize = 2048;
 pub const DEFAULT_STRING_SIZE: usize = 70;

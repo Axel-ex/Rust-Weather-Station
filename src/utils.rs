@@ -1,9 +1,5 @@
-use crate::config::{CONFIG, PAYLOAD_SIZE, TOPIC_SIZE};
-use crate::tasks::mqtt_task::{MqttPacket, MQTT_CHANNEL};
-use core::fmt::Write;
 use embassy_net::Stack;
-use embassy_time::{Duration, TimeoutError, Timer, WithTimeout};
-use heapless::String;
+use embassy_time::{Duration, TimeoutError, WithTimeout};
 
 pub async fn wait_for_stack(stack: &Stack<'static>) -> Result<(), TimeoutError> {
     stack
@@ -19,13 +15,24 @@ pub async fn wait_for_stack(stack: &Stack<'static>) -> Result<(), TimeoutError> 
     Ok(())
 }
 
-pub async fn publish_rain() {
-    Timer::after_secs(2).await;
-    let mut topic = String::<TOPIC_SIZE>::new();
-    let mut payload = String::<PAYLOAD_SIZE>::new();
-    write!(&mut topic, "{}/rain", CONFIG.topic).unwrap();
-    write!(&mut payload, "0.231").unwrap();
+#[macro_export]
+macro_rules! publish {
+    ($sender:expr, $suffix:expr, $val:expr) => {{
+        // Absolute paths + $crate to avoid hygiene issues.
+        let mut topic: ::heapless::String<{ $crate::config::TOPIC_SIZE }> =
+            ::heapless::String::new();
+        let mut payload: ::heapless::String<{ $crate::config::PAYLOAD_SIZE }> =
+            ::heapless::String::new();
 
-    let packet = MqttPacket::new(&topic, &payload);
-    MQTT_CHANNEL.send(packet).await;
+        let _ = ::core::fmt::Write::write_fmt(
+            &mut topic,
+            ::core::format_args!("{}/{}", $crate::config::CONFIG.topic, $suffix),
+        );
+        // This is effectively "{}"
+        let _ = ::core::fmt::Write::write_fmt(&mut payload, ::core::format_args!("{}", $val));
+
+        $sender
+            .send($crate::tasks::mqtt_task::MqttPacket::new(topic, payload))
+            .await;
+    }};
 }

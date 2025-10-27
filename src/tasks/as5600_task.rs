@@ -1,7 +1,5 @@
-use core::fmt::Write as _;
-use core::str::FromStr;
-
 use as5600::asynch::As5600;
+use core::str::FromStr;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_futures::select::{select, Either};
 use embassy_sync::channel::Sender;
@@ -30,8 +28,8 @@ pub async fn as5600_task(
 
     info!("Starting as5600 task");
     let mut ticker = Ticker::every(Duration::from_secs(CONFIG.task_dur_secs));
-    let mut nb_measurements: f32 = 1.0;
-    let mut avg_angle: f32 = 0.0;
+    let mut nb_measurements: f32 = 0.0;
+    let mut sum_angle: f32 = 0.0;
 
     loop {
         let tick = ticker.next();
@@ -42,7 +40,7 @@ pub async fn as5600_task(
                     continue;
                 }
 
-                avg_angle = (avg_angle + current_angle) / nb_measurements;
+                sum_angle = sum_angle + current_angle;
                 nb_measurements += 1.0;
             }
             Either::Second(()) => {
@@ -50,15 +48,12 @@ pub async fn as5600_task(
             }
         }
     }
-
-    info!("measured angle {}", avg_angle);
-    let mut payload = String::<DEFAULT_STRING_SIZE>::new();
-    write!(&mut payload, "{}", match_direction(avg_angle)).unwrap();
-    let mut topic = String::<DEFAULT_STRING_SIZE>::new();
-    write!(&mut topic, "{}/anemo/wind_direction", CONFIG.topic).unwrap();
-    let packet = MqttPacket::new(&topic, &payload);
-
-    mqtt_sender.send(packet).await;
+    info!("avg angle: {}", sum_angle / nb_measurements);
+    publish!(
+        &mqtt_sender,
+        "anemo/wind_direction",
+        match_direction(sum_angle / nb_measurements)
+    );
 }
 
 async fn get_wind_direction(

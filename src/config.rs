@@ -18,7 +18,7 @@ pub struct Config {
     topic: &'static str,
     #[default(1200)]
     deep_sleep_dur_secs: u64,
-    #[default(65)]
+    #[default(10)]
     main_task_dur_secs: u64,
     #[default(60)]
     task_dur_secs: u64,

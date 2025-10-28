@@ -6,6 +6,8 @@
     holding buffers for the duration of a data transfer."
 )]
 
+use core::time::Duration;
+
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
 use embassy_net::StackResources;
@@ -70,6 +72,15 @@ async fn main(spawner: Spawner) -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
+
+    let mut timg1 = TimerGroup::new(peripherals.TIMG1);
+    let mut watchdog = timg1.wdt;
+    let watchdog_timeout = Duration::from_secs(CONFIG.main_task_dur_secs);
+    let _ = watchdog.start(watchdog_timeout);
+    info!(
+        "Main watchdog configured for {} seconds",
+        CONFIG.main_task_dur_secs
+    );
 
     // Init wifi
     let radio_init = mk_static!(
@@ -146,7 +157,12 @@ async fn main(spawner: Spawner) -> ! {
     spawner.spawn(anemo_task(anemo_pin, sender_anemo)).ok();
     spawner.spawn(as5600_task(as_i2c, sender_as5600)).ok();
     spawner.spawn(ina210_task(ina_i2c, sender_ina219)).ok();
-    Timer::after_secs(CONFIG.main_task_dur_secs).await;
+
+    for _ in 0..CONFIG.main_task_dur_secs as usize {
+        Timer::after_secs(1).await;
+        watchdog.feed();
+    }
+    let _ = watchdog.disable();
 
     info!("Going to sleep...");
     transistor_pin.set_low();

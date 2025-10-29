@@ -59,7 +59,6 @@ extern crate alloc;
 // This creates a default app-descriptor required by the esp-idf bootloader.
 esp_bootloader_esp_idf::esp_app_desc!();
 
-//TODO: move const in config
 #[esp_rtos::main]
 async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
@@ -74,11 +73,8 @@ async fn main(spawner: Spawner) -> ! {
     let timg1 = TimerGroup::new(peripherals.TIMG1);
     let mut watchdog = timg1.wdt;
     let watchdog_timeout = esp_hal::time::Duration::from_secs(CONFIG.main_task_dur_secs + 10);
-    let _ = watchdog.set_timeout(esp_hal::timer::timg::MwdtStage::Stage0, watchdog_timeout);
-    info!(
-        "Main watchdog configured for {} seconds",
-        CONFIG.main_task_dur_secs
-    );
+    watchdog.set_timeout(esp_hal::timer::timg::MwdtStage::Stage0, watchdog_timeout);
+    watchdog.enable();
 
     // Init wifi
     let radio_init = mk_static!(
@@ -106,7 +102,7 @@ async fn main(spawner: Spawner) -> ! {
     wait_for_stack(&stack)
         .await
         .inspect(|_| info!("Got config: {:?}", stack.config_v4()))
-        .unwrap(); // crash if the stack never gets up
+        .unwrap(); //WARN: should we crash really?
     spawner.spawn(mqtt_task(stack, receiver)).unwrap();
 
     //PERIPHERALS
@@ -156,10 +152,11 @@ async fn main(spawner: Spawner) -> ! {
     spawner.spawn(as5600_task(as_i2c, sender_as5600)).ok();
     spawner.spawn(ina210_task(ina_i2c, sender_ina219)).ok();
 
-    watchdog.enable();
+    watchdog.feed();
     Timer::after_secs(CONFIG.main_task_dur_secs).await;
     info!("Going to sleep...");
     transistor_pin.set_low();
+    watchdog.disable();
     Timer::after_secs(1).await;
     rtc.sleep_deep(&[&deep_sleep_timer, &ext0]);
 }

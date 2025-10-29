@@ -18,10 +18,12 @@ pub struct Config {
     topic: &'static str,
     #[default(1200)]
     deep_sleep_dur_secs: u64,
-    #[default(10)]
+    #[default(35)]
     main_task_dur_secs: u64,
-    #[default(60)]
+    #[default(30)]
     task_dur_secs: u64,
+    #[default(60)]
+    watchdog_timeout_secs: u64,
 }
 
 pub const MAX_RETRY: i32 = 5;

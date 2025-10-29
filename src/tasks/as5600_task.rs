@@ -40,7 +40,7 @@ pub async fn as5600_task(
                     continue;
                 }
 
-                sum_angle = sum_angle + current_angle;
+                sum_angle += current_angle;
                 nb_measurements += 1.0;
             }
             Either::Second(()) => {
@@ -53,6 +53,11 @@ pub async fn as5600_task(
         &mqtt_sender,
         "anemo/wind_direction",
         match_direction(sum_angle / nb_measurements)
+    );
+    publish!(
+        &mqtt_sender,
+        "anemo/wind_angle",
+        sum_angle / nb_measurements
     );
 }
 

@@ -26,10 +26,7 @@ pub struct MqttPacket {
 
 impl MqttPacket {
     pub fn new(topic: String<TOPIC_SIZE>, payload: String<PAYLOAD_SIZE>) -> Self {
-        MqttPacket {
-            topic: topic,
-            payload: payload,
-        }
+        MqttPacket { topic, payload }
     }
 }
 

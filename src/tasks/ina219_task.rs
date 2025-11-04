@@ -15,15 +15,17 @@ pub async fn ina210_task(
     i2c: &'static mut I2cDevice<'static, CriticalSectionRawMutex, I2c<'static, Async>>,
     mqtt_sender: Sender<'static, CriticalSectionRawMutex, MqttPacket, CHANNEL_SIZE>,
 ) {
-    let calib = IntCalibration::new(MicroAmpere(1_000_000), 1_000).unwrap();
-    let mut ina =
-        match AsyncIna219::new_calibrated(i2c, Address::from_byte(0x40).unwrap(), calib).await {
-            Ok(ina) => ina,
-            Err(e) => {
-                error!("Error initiating the ina219: {:?}", e);
-                return;
-            }
-        };
+    let current_lsb = MicroAmpere(15); // max current (0.5A) / 32767 (size of reg)
+    let r_shunt_uohm = 100_000;
+
+    let calib = IntCalibration::new(current_lsb, r_shunt_uohm).unwrap();
+    let mut ina = match AsyncIna219::new_calibrated(i2c, Address::default(), calib).await {
+        Ok(ina) => ina,
+        Err(e) => {
+            error!("Error initiating the ina219: {:?}", e);
+            return;
+        }
+    };
 
     let mut retry = 0;
     while retry < MAX_RETRY {

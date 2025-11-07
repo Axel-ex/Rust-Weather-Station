@@ -1,5 +1,10 @@
 # Rust Weather Station
 
+<div align="center">
+  <img src=".github/assets/demo.jpg" width="60%" alt="Weather Station Demo" />
+</div>
+
+---
 This repository contains the firmware for a solar-powered weather station based on an ESP32. The software is implemented entirely in Rust using the `esp-hal` hardware abstraction layer and the `embassy` async ecosystem. Sensor data is collected concurrently, published over MQTT, and the device returns to deep sleep to preserve the battery between sampling windows.
 
 ## Hardware overview

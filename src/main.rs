@@ -20,7 +20,8 @@ use esp_hal::rtc_cntl::sleep::TimerWakeupSource;
 use esp_hal::rtc_cntl::sleep::{Ext0WakeupSource, WakeupLevel};
 use esp_hal::rtc_cntl::{wakeup_cause, Rtc};
 use esp_hal::system::{software_reset, SleepSource};
-use esp_hal::timer::timg::TimerGroup;
+use esp_hal::time::Duration;
+use esp_hal::timer::timg::{MwdtStage, TimerGroup};
 use esp_hal::{i2c, Async};
 use esp_radio::Controller;
 use log::info;
@@ -72,8 +73,8 @@ async fn main(spawner: Spawner) -> ! {
 
     let timg1 = TimerGroup::new(peripherals.TIMG1);
     let mut watchdog = timg1.wdt;
-    let watchdog_timeout = esp_hal::time::Duration::from_secs(CONFIG.main_task_dur_secs + 10);
-    watchdog.set_timeout(esp_hal::timer::timg::MwdtStage::Stage0, watchdog_timeout);
+    let watchdog_timeout = Duration::from_secs(CONFIG.main_task_dur_secs + 10);
+    watchdog.set_timeout(MwdtStage::Stage0, watchdog_timeout);
     watchdog.enable();
 
     // Init wifi
@@ -102,11 +103,10 @@ async fn main(spawner: Spawner) -> ! {
     wait_for_stack(&stack)
         .await
         .inspect(|_| info!("Got config: {:?}", stack.config_v4()))
-        .unwrap(); //WARN: should we crash really?
+        .unwrap();
     spawner.spawn(mqtt_task(stack, receiver)).unwrap();
 
     //PERIPHERALS
-    // PINS
     let dht_pin = Flex::new(peripherals.GPIO32);
     let mut transistor_pin = Output::new(
         peripherals.GPIO17,

@@ -5,6 +5,7 @@
 </div>
 
 ---
+
 This repository contains the firmware for a solar-powered weather station based on an ESP32. The software is implemented entirely in Rust using the `esp-hal` hardware abstraction layer and the `embassy` async ecosystem. Sensor data is collected concurrently, published over MQTT, and the device returns to deep sleep to preserve the battery between sampling windows.
 
 ## Hardware overview
@@ -61,13 +62,9 @@ Adjust `deep_sleep_dur_secs`, `main_task_dur_secs`, and `task_dur_secs` to contr
 3. Build and flash the firmware:
 
    ```bash
-   cargo espflash flash --release /dev/ttyUSB0
+   cargo run
    ```
 
    Replace the serial port path with the one that matches your workstation.
 
 After flashing, the station will connect to the configured Wi-Fi network, stream sensor values to the MQTT broker, and fall back to deep sleep between sampling intervals.
-
-## Thread-to-thread queue example
-
-For a smaller example demonstrating the same queueing pattern between tasks, see `examples/dht_mqtt_queue.rs`. It shows how a sensor sampling task can push readings into a FreeRTOS queue that an MQTT publisher drains using `esp-idf-svc` primitives.

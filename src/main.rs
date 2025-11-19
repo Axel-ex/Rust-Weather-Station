@@ -40,6 +40,10 @@ use crate::tasks::wifi_task::{runner_task, wifi_task};
 use crate::utils::wait_for_stack;
 use tasks::dht_task::dht_task;
 
+//transistor 17
+//rain pin 25
+// dht 32
+// anemo 27
 // use esp_backtrace as _;
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo) -> ! {
@@ -65,7 +69,7 @@ async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
 
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
-    let peripherals = esp_hal::init(config);
+    let mut peripherals = esp_hal::init(config);
     esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 98767);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
@@ -139,11 +143,6 @@ async fn main(spawner: Spawner) -> ! {
     let sender_as5600 = MQTT_CHANNEL.sender();
     let sender_ina219 = MQTT_CHANNEL.sender();
 
-    let mut rtc = Rtc::new(peripherals.LPWR);
-    let deep_sleep_timer =
-        TimerWakeupSource::new(core::time::Duration::from_secs(CONFIG.deep_sleep_dur_secs));
-    let ext0 = Ext0WakeupSource::new(peripherals.GPIO25, WakeupLevel::Low);
-
     if let SleepSource::Ext0 = wakeup_cause() {
         publish!(&MQTT_CHANNEL.sender(), "rain", "0.231");
     }
@@ -155,8 +154,14 @@ async fn main(spawner: Spawner) -> ! {
     watchdog.feed();
     Timer::after_secs(CONFIG.main_task_dur_secs).await;
     info!("Going to sleep...");
+
     transistor_pin.set_low();
     watchdog.disable();
     Timer::after_secs(1).await;
+
+    let mut rtc = Rtc::new(peripherals.LPWR);
+    let deep_sleep_timer =
+        TimerWakeupSource::new(core::time::Duration::from_secs(CONFIG.deep_sleep_dur_secs));
+    let ext0 = Ext0WakeupSource::new(peripherals.GPIO25, WakeupLevel::Low);
     rtc.sleep_deep(&[&deep_sleep_timer, &ext0]);
 }

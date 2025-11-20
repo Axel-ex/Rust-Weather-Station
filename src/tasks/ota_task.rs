@@ -33,8 +33,10 @@ pub async fn ota_task(
     watchdog: &mut Wdt<TIMG1<'_>>,
     led: Output<'_>,
 ) {
-    static TCP_STATE: StaticCell<TcpClientState<NB_CON, TX_SIZE, RX_SIZE>> = StaticCell::new();
-    let state = TCP_STATE.init(TcpClientState::new());
+    let state = mk_static!(
+        TcpClientState<NB_CON, TX_SIZE, RX_SIZE>,
+        TcpClientState::new()
+    );
 
     let tcp = TcpClient::new(stack, state);
     let dns = DnsSocket::new(stack);

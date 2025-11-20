@@ -4,11 +4,11 @@ use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::channel::Sender;
 use embassy_time::Timer;
-use esp_hal::i2c::master::I2c;
 use esp_hal::Async;
+use esp_hal::i2c::master::I2c;
+use ina219::AsyncIna219;
 use ina219::address::Address;
 use ina219::calibration::{IntCalibration, MicroAmpere};
-use ina219::AsyncIna219;
 use log::error;
 
 #[embassy_executor::task]
@@ -35,7 +35,12 @@ pub async fn ina210_task(
             Ok(voltage) => {
                 let voltage = (voltage.voltage_mv() + 150) as f32;
                 publish!(&mqtt_sender, "battery/voltage", voltage);
-                publish!(&mqtt_sender, "battery/percentage", voltage_to_soc(voltage));
+                publish!(
+                    &mqtt_sender,
+                    "battery/percentage",
+                    voltage_to_soc(voltage / 1000.0)
+                );
+                publish!(&mqtt_sender, "test", 1);
                 break;
             }
             Err(e) => error!("Fail reading ina219: {:?}", e),

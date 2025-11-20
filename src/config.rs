@@ -24,6 +24,8 @@ pub struct Config {
     task_dur_secs: u64,
     #[default(60)]
     watchdog_timeout_secs: u64,
+    #[default("url")]
+    ota_url: &'static str,
 }
 
 pub const MAX_RETRY: i32 = 5;

@@ -1,10 +1,13 @@
+use crate::config::CONFIG;
 use embassy_net::{
     dns::DnsSocket,
     tcp::client::{TcpClient, TcpClientState},
 };
-use embassy_time::{with_timeout, Duration};
+use embassy_time::{Duration, with_timeout};
 use embedded_io_async::Read as _;
-use esp_hal::peripherals::FLASH;
+use esp_hal::peripherals::TIMG1;
+use esp_hal::timer::timg::Wdt;
+use esp_hal::{gpio::Output, peripherals::FLASH};
 use esp_hal_ota::Ota;
 use esp_storage::FlashStorage;
 use log::{error, info};
@@ -15,7 +18,6 @@ use reqwless::{
 };
 use static_cell::StaticCell;
 
-const URL: &str = "http://192.168.1.77:8000/";
 const NB_CON: usize = 1;
 const RX_SIZE: usize = 4096;
 const TX_SIZE: usize = 1024;
@@ -25,7 +27,12 @@ type OtaType = Ota<FlashStorage<'static>>;
 
 static OTA_CELL: StaticCell<OtaType> = StaticCell::new();
 
-pub async fn ota_task(stack: embassy_net::Stack<'static>, ota_handle: &'static mut OtaType) {
+pub async fn ota_task(
+    stack: embassy_net::Stack<'static>,
+    ota_handle: &'static mut OtaType,
+    watchdog: &mut Wdt<TIMG1<'_>>,
+    led: Output<'_>,
+) {
     static TCP_STATE: StaticCell<TcpClientState<NB_CON, TX_SIZE, RX_SIZE>> = StaticCell::new();
     let state = TCP_STATE.init(TcpClientState::new());
 
@@ -37,7 +44,7 @@ pub async fn ota_task(stack: embassy_net::Stack<'static>, ota_handle: &'static m
 
     if let Ok(res) = with_timeout(
         Duration::from_secs(TIMEOUT_SECS),
-        client.request(Method::GET, URL),
+        client.request(Method::GET, CONFIG.ota_url),
     )
     .await
     {
@@ -46,7 +53,7 @@ pub async fn ota_task(stack: embassy_net::Stack<'static>, ota_handle: &'static m
                 let mut rx_buff = [0u8; RX_SIZE];
                 match req.send(&mut rx_buff).await {
                     Ok(response) => {
-                        do_update(response, ota_handle).await;
+                        do_update(response, ota_handle, watchdog, led).await;
                     }
                     Err(e) => {
                         error!("Sending the request: {:?}", e);
@@ -66,8 +73,12 @@ pub fn init_ota(flash: FLASH<'static>) -> &'static mut OtaType {
     })
 }
 
-pub async fn do_update<'resp, 'buf, C>(response: Response<'resp, 'buf, C>, ota_handle: &mut OtaType)
-where
+pub async fn do_update<'resp, 'buf, C>(
+    response: Response<'resp, 'buf, C>,
+    ota_handle: &mut OtaType,
+    watchdog: &mut Wdt<TIMG1<'_>>,
+    mut led: Output<'_>,
+) where
     C: embedded_io_async::Read,
 {
     let flash_size = response.content_length.unwrap_or_default() as u32;
@@ -86,7 +97,9 @@ where
     let mut chunk = [0u8; RX_SIZE];
     let mut bytes_sent: u32 = 0;
 
+    led.set_high();
     loop {
+        // led.set_high();
         // Only read up to the remaining bytes
         let remaining = flash_size - bytes_sent;
         if remaining == 0 {
@@ -95,6 +108,7 @@ where
 
         let to_read = core::cmp::min(chunk.len(), remaining as usize);
 
+        watchdog.feed();
         let n = reader.read(&mut chunk[..to_read]).await.unwrap();
         info!("OTA: read {} bytes", n);
 
@@ -111,11 +125,13 @@ where
         let res = ota_handle.ota_write_chunk(&chunk[..n]);
         info!("OTA: ota_write_chunk -> {:?}", res);
 
+        // led.set_low();
         if res == Ok(true) {
             info!("OTA: write_chunk reports completion, flushing...");
             match ota_handle.ota_flush(true, true) {
                 Ok(_) => {
                     info!("Valid image received, restarting!");
+                    led.set_low();
                     esp_hal::system::software_reset();
                 }
                 Err(e) => {

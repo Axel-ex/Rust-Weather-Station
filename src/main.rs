@@ -8,7 +8,6 @@
 
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
-use embassy_futures::block_on;
 use embassy_net::StackResources;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::mutex::Mutex;
@@ -19,11 +18,12 @@ use esp_hal::i2c::master::I2c;
 use esp_hal::rng::Rng;
 use esp_hal::rtc_cntl::sleep::TimerWakeupSource;
 use esp_hal::rtc_cntl::sleep::{Ext0WakeupSource, WakeupLevel};
-use esp_hal::rtc_cntl::{wakeup_cause, Rtc};
-use esp_hal::system::{software_reset, SleepSource};
+use esp_hal::rtc_cntl::{Rtc, wakeup_cause};
+use esp_hal::system::SleepSource;
+use esp_hal::system::software_reset;
 use esp_hal::time::Duration;
 use esp_hal::timer::timg::{MwdtStage, TimerGroup};
-use esp_hal::{i2c, Async};
+use esp_hal::{Async, i2c};
 use esp_radio::Controller;
 use log::info;
 
@@ -36,7 +36,7 @@ use crate::config::CONFIG;
 use crate::tasks::anemo_task::anemo_task;
 use crate::tasks::as5600_task::as5600_task;
 use crate::tasks::ina219_task::ina210_task;
-use crate::tasks::mqtt_task::{mqtt_task, MQTT_CHANNEL};
+use crate::tasks::mqtt_task::{MQTT_CHANNEL, mqtt_task};
 use crate::tasks::ota_task::{init_ota, ota_task};
 use crate::tasks::wifi_task::{runner_task, wifi_task};
 use crate::utils::wait_for_stack;
@@ -46,11 +46,11 @@ use tasks::dht_task::dht_task;
 //rain pin 25
 // dht 32
 // anemo 27
-use esp_backtrace as _;
-// #[panic_handler]
-// fn panic(_: &core::panic::PanicInfo) -> ! {
-//     software_reset();
-// }
+// use esp_backtrace as _;
+#[panic_handler]
+fn panic(_: &core::panic::PanicInfo) -> ! {
+    software_reset();
+}
 
 //I2c
 type BusI2C = I2c<'static, Async>;
@@ -84,7 +84,6 @@ async fn main(spawner: Spawner) -> ! {
     watchdog.enable();
 
     // Init wifi
-    info!("AYOOOOOOOOOOO");
     let radio_init = mk_static!(
         Controller<'static>,
         esp_radio::init().expect("Failed to initialize Wi-Fi/BLE controller")
@@ -111,10 +110,16 @@ async fn main(spawner: Spawner) -> ! {
         .await
         .inspect(|_| info!("Got config: {:?}", stack.config_v4()))
         .unwrap();
+
     //check for OTA
     let flash = peripherals.FLASH;
+    let builtin_led = Output::new(
+        peripherals.GPIO2,
+        esp_hal::gpio::Level::Low,
+        OutputConfig::default(),
+    );
     let ota_handle = init_ota(flash);
-    ota_task(stack, ota_handle).await;
+    ota_task(stack, ota_handle, &mut watchdog, builtin_led).await;
 
     spawner.spawn(mqtt_task(stack, receiver)).unwrap();
 

@@ -4,3 +4,6 @@
 /Cargo.lock
 cfg.toml
 .DS_Store
+*.bin
+ota_server/target/
+ota_server/Cargo.lock

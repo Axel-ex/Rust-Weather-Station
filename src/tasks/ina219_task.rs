@@ -33,7 +33,7 @@ pub async fn ina210_task(
     while retry < MAX_RETRY {
         match ina.bus_voltage().await {
             Ok(voltage) => {
-                let voltage = (voltage.voltage_mv() + 150) as f32;
+                let voltage = (voltage.voltage_mv() + 160) as f32;
                 publish!(&mqtt_sender, "battery/voltage", voltage);
                 publish!(
                     &mqtt_sender,

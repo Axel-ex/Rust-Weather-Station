@@ -99,9 +99,8 @@ pub async fn do_update<'resp, 'buf, C>(
     let mut chunk = [0u8; RX_SIZE];
     let mut bytes_sent: u32 = 0;
 
-    led.set_high();
     loop {
-        // led.set_high();
+        led.set_high();
         // Only read up to the remaining bytes
         let remaining = flash_size - bytes_sent;
         if remaining == 0 {
@@ -126,6 +125,7 @@ pub async fn do_update<'resp, 'buf, C>(
 
         let res = ota_handle.ota_write_chunk(&chunk[..n]);
         info!("OTA: ota_write_chunk -> {:?}", res);
+        led.set_low();
 
         // led.set_low();
         if res == Ok(true) {
@@ -133,7 +133,7 @@ pub async fn do_update<'resp, 'buf, C>(
             match ota_handle.ota_flush(true, true) {
                 Ok(_) => {
                     info!("Valid image received, restarting!");
-                    led.set_low();
+
                     esp_hal::system::software_reset();
                 }
                 Err(e) => {

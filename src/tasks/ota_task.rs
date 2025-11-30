@@ -5,9 +5,9 @@ use embassy_net::{
 };
 use embassy_time::{Duration, with_timeout};
 use embedded_io_async::Read as _;
+use esp_hal::peripherals::FLASH;
 use esp_hal::peripherals::TIMG1;
 use esp_hal::timer::timg::Wdt;
-use esp_hal::{gpio::Output, peripherals::FLASH};
 use esp_hal_ota::Ota;
 use esp_storage::FlashStorage;
 use log::{error, info};
@@ -31,7 +31,6 @@ pub async fn ota_task(
     stack: embassy_net::Stack<'static>,
     ota_handle: &'static mut OtaType,
     watchdog: &mut Wdt<TIMG1<'_>>,
-    led: Output<'_>,
 ) {
     let state = mk_static!(
         TcpClientState<NB_CON, TX_SIZE, RX_SIZE>,
@@ -55,7 +54,7 @@ pub async fn ota_task(
                 let mut rx_buff = [0u8; RX_SIZE];
                 match req.send(&mut rx_buff).await {
                     Ok(response) => {
-                        do_update(response, ota_handle, watchdog, led).await;
+                        do_update(response, ota_handle, watchdog).await;
                     }
                     Err(e) => {
                         error!("Sending the request: {:?}", e);
@@ -79,7 +78,6 @@ pub async fn do_update<'resp, 'buf, C>(
     response: Response<'resp, 'buf, C>,
     ota_handle: &mut OtaType,
     watchdog: &mut Wdt<TIMG1<'_>>,
-    mut led: Output<'_>,
 ) where
     C: embedded_io_async::Read,
 {
@@ -100,7 +98,6 @@ pub async fn do_update<'resp, 'buf, C>(
     let mut bytes_sent: u32 = 0;
 
     loop {
-        led.set_high();
         // Only read up to the remaining bytes
         let remaining = flash_size - bytes_sent;
         if remaining == 0 {
@@ -125,7 +122,6 @@ pub async fn do_update<'resp, 'buf, C>(
 
         let res = ota_handle.ota_write_chunk(&chunk[..n]);
         info!("OTA: ota_write_chunk -> {:?}", res);
-        led.set_low();
 
         // led.set_low();
         if res == Ok(true) {

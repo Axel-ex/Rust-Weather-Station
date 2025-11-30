@@ -1,5 +1,50 @@
 use embassy_net::Stack;
 use embassy_time::{Duration, TimeoutError, WithTimeout};
+use esp_hal::ram;
+use esp_hal::rtc_cntl::Rtc;
+use log::info;
+
+// seconds since boot for next full measurement
+#[ram(unstable(rtc_fast), unstable(persistent))]
+static mut NEXT_FULL_MEASUREMENT_S: u64 = 0;
+
+pub fn load_next_full_measurement_s() -> u64 {
+    unsafe { NEXT_FULL_MEASUREMENT_S }
+}
+
+pub fn store_next_full_measurement_s(v: u64) {
+    unsafe {
+        NEXT_FULL_MEASUREMENT_S = v;
+    }
+}
+
+// helper to get “now” in seconds since boot, from Rtc
+pub fn now_s(rtc: &Rtc<'_>) -> u64 {
+    let d = rtc.time_since_boot(); // esp-hal API
+    d.as_secs()
+}
+
+// Instead of waking up with the rain snesor and powering up the whole wifi stack, its preferable
+// to do a minimum of work -> just record the tipping of the pluvimeter in the RAIN_TIPS and sleep.
+#[ram(unstable(rtc_fast), unstable(persistent))]
+static mut RAIN_TIPS: u32 = 0;
+
+pub fn load_rain_tips() -> u32 {
+    let rain_tips = unsafe { RAIN_TIPS };
+    if rain_tips > 100 { 0 } else { rain_tips } //avoid unitialized weird values
+}
+
+pub fn store_rain_tips(v: u32) {
+    unsafe {
+        RAIN_TIPS = v;
+    }
+}
+
+pub fn inc_rain_tips() {
+    let cur = load_rain_tips();
+    store_rain_tips(cur.saturating_add(1));
+    info!("Incremented to {}", load_rain_tips());
+}
 
 pub async fn wait_for_stack(stack: &Stack<'static>) -> Result<(), TimeoutError> {
     stack

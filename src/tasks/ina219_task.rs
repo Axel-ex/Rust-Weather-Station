@@ -40,7 +40,6 @@ pub async fn ina210_task(
                     "battery/percentage",
                     voltage_to_soc(voltage / 1000.0)
                 );
-                publish!(&mqtt_sender, "test", 1);
                 break;
             }
             Err(e) => error!("Fail reading ina219: {:?}", e),

@@ -16,6 +16,7 @@ use esp_hal::clock::CpuClock;
 use esp_hal::gpio::{Flex, Input, InputConfig, Output, OutputConfig};
 use esp_hal::i2c::master::I2c;
 use esp_hal::rng::Rng;
+use esp_hal::rtc_cntl::sleep::RtcSleepConfig;
 use esp_hal::rtc_cntl::sleep::TimerWakeupSource;
 use esp_hal::rtc_cntl::sleep::{Ext0WakeupSource, WakeupLevel};
 use esp_hal::rtc_cntl::{Rtc, wakeup_cause};
@@ -39,8 +40,9 @@ use crate::tasks::ina219_task::ina210_task;
 use crate::tasks::mqtt_task::{MQTT_CHANNEL, mqtt_task};
 use crate::tasks::ota_task::{init_ota, ota_task};
 use crate::tasks::wifi_task::{runner_task, wifi_task};
-use crate::utils::wait_for_stack;
+use crate::utils::{inc_rain_tips, load_rain_tips, store_rain_tips, wait_for_stack};
 use tasks::dht_task::dht_task;
+use utils::{load_next_full_measurement_s, now_s, store_next_full_measurement_s};
 
 //transistor 17
 //rain pin 25
@@ -77,6 +79,32 @@ async fn main(spawner: Spawner) -> ! {
     watchdog.set_timeout(MwdtStage::Stage0, watchdog_timeout);
     watchdog.enable();
 
+    //Configure deep sleep
+    let mut rtc = Rtc::new(peripherals.LPWR);
+    let mut cfg = RtcSleepConfig::deep();
+    cfg.set_rtc_fastmem_pd_en(false);
+    let ext0 = Ext0WakeupSource::new(peripherals.GPIO25, WakeupLevel::Low);
+    let now = now_s(&rtc);
+    let mut next_full = load_next_full_measurement_s();
+    if next_full == 0 {
+        next_full = now + CONFIG.deep_sleep_dur_secs as u64;
+        store_next_full_measurement_s(next_full);
+    } //first boot, we set the timer to sleep for deep sleep dur
+
+    //if we detected rain, we increment the var and sleep for next full - now.
+    if let SleepSource::Ext0 = wakeup_cause() {
+        inc_rain_tips();
+        info!("Rain detected, going back to sleep");
+        Timer::after_millis(200).await;
+
+        let remaining = next_full - now;
+        let sleep_secs = core::cmp::max(remaining, 1); //avoid 0
+
+        let timer = TimerWakeupSource::new(core::time::Duration::from_secs(sleep_secs as u64));
+
+        rtc.sleep(&cfg, &[&timer, &ext0]);
+    }
+
     // Init wifi
     let radio_init = mk_static!(
         Controller<'static>,
@@ -107,13 +135,8 @@ async fn main(spawner: Spawner) -> ! {
 
     //check for OTA
     let flash = peripherals.FLASH;
-    let builtin_led = Output::new(
-        peripherals.GPIO2,
-        esp_hal::gpio::Level::Low,
-        OutputConfig::default(),
-    );
     let ota_handle = init_ota(flash);
-    ota_task(stack, ota_handle, &mut watchdog, builtin_led).await;
+    ota_task(stack, ota_handle, &mut watchdog).await;
 
     spawner.spawn(mqtt_task(stack, receiver)).unwrap();
 
@@ -150,13 +173,17 @@ async fn main(spawner: Spawner) -> ! {
     let sender_as5600 = MQTT_CHANNEL.sender();
     let sender_ina219 = MQTT_CHANNEL.sender();
 
-    if let SleepSource::Ext0 = wakeup_cause() {
-        publish!(&MQTT_CHANNEL.sender(), "rain", "0.231");
-    }
     spawner.spawn(dht_task(dht_pin, sender_dht)).ok();
     spawner.spawn(anemo_task(anemo_pin, sender_anemo)).ok();
     spawner.spawn(as5600_task(as_i2c, sender_as5600)).ok();
     spawner.spawn(ina210_task(ina_i2c, sender_ina219)).ok();
+
+    publish!(
+        MQTT_CHANNEL.sender(),
+        "rain",
+        load_rain_tips() as f32 * 0.231
+    );
+    store_rain_tips(0);
 
     watchdog.feed();
     Timer::after_secs(CONFIG.main_task_dur_secs).await;
@@ -164,11 +191,11 @@ async fn main(spawner: Spawner) -> ! {
 
     transistor_pin.set_low();
     watchdog.disable();
+    store_next_full_measurement_s(now_s(&rtc) + CONFIG.deep_sleep_dur_secs as u64);
     Timer::after_secs(1).await;
 
-    let mut rtc = Rtc::new(peripherals.LPWR);
-    let deep_sleep_timer =
-        TimerWakeupSource::new(core::time::Duration::from_secs(CONFIG.deep_sleep_dur_secs));
-    let ext0 = Ext0WakeupSource::new(peripherals.GPIO25, WakeupLevel::Low);
-    rtc.sleep_deep(&[&deep_sleep_timer, &ext0]);
+    let timer = TimerWakeupSource::new(core::time::Duration::from_secs(CONFIG.deep_sleep_dur_secs));
+    rtc.sleep(&cfg, &[&timer, &ext0]);
+
+    loop {}
 }

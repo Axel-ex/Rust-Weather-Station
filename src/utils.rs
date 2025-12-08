@@ -1,3 +1,4 @@
+use crate::config::CONFIG;
 use embassy_net::Stack;
 use embassy_time::{Duration, TimeoutError, WithTimeout};
 use esp_hal::ram;
@@ -7,6 +8,8 @@ use log::info;
 // seconds since boot for next full measurement
 #[ram(unstable(rtc_fast), unstable(persistent))]
 static mut NEXT_FULL_MEASUREMENT_S: u64 = 0;
+#[ram(unstable(rtc_fast), unstable(persistent))]
+static mut LAST_TIP: u64 = 0;
 
 pub fn load_next_full_measurement_s() -> u64 {
     unsafe { NEXT_FULL_MEASUREMENT_S }
@@ -15,6 +18,16 @@ pub fn load_next_full_measurement_s() -> u64 {
 pub fn store_next_full_measurement_s(v: u64) {
     unsafe {
         NEXT_FULL_MEASUREMENT_S = v;
+    }
+}
+
+pub fn load_last_tip() -> u64 {
+    unsafe { LAST_TIP }
+}
+
+pub fn store_last_tip(v: u64) {
+    unsafe {
+        LAST_TIP = v;
     }
 }
 
@@ -40,10 +53,21 @@ pub fn store_rain_tips(v: u32) {
     }
 }
 
-pub fn inc_rain_tips() {
+pub fn inc_rain_tips(now: u64) {
     let cur = load_rain_tips();
-    store_rain_tips(cur.saturating_add(1));
-    info!("Incremented to {}", load_rain_tips());
+    let last_tip = load_last_tip();
+
+    if cur == 0 {
+        store_rain_tips(cur.saturating_add(1));
+        store_last_tip(now);
+        return;
+    }
+
+    if last_tip != 0 && now.saturating_sub(last_tip) > CONFIG.rain_debounce_s {
+        store_rain_tips(cur.saturating_add(1));
+        store_last_tip(now);
+        info!("Incremented to {}", load_rain_tips());
+    }
 }
 
 pub async fn wait_for_stack(stack: &Stack<'static>) -> Result<(), TimeoutError> {

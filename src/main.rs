@@ -81,9 +81,12 @@ async fn main(spawner: Spawner) -> ! {
 
     //Configure deep sleep
     let mut rtc = Rtc::new(peripherals.LPWR);
+
     let mut cfg = RtcSleepConfig::deep();
     cfg.set_rtc_fastmem_pd_en(false);
+
     let ext0 = Ext0WakeupSource::new(peripherals.GPIO25, WakeupLevel::Low);
+
     let now = now_s(&rtc);
     let mut next_full = load_next_full_measurement_s();
     if next_full == 0 {
@@ -93,18 +96,17 @@ async fn main(spawner: Spawner) -> ! {
 
     //if we detected rain, we increment the var and sleep for next full - now.
     if let SleepSource::Ext0 = wakeup_cause() {
-        inc_rain_tips();
-        info!("Rain detected, going back to sleep");
-        Timer::after_millis(200).await;
-
         let remaining = next_full - now;
         let sleep_secs = core::cmp::max(remaining, 1); //avoid 0
 
         let timer = TimerWakeupSource::new(core::time::Duration::from_secs(sleep_secs as u64));
 
+        inc_rain_tips(now);
         rtc.sleep(&cfg, &[&timer, &ext0]);
     }
 
+    // If not we woke up from the deep sleep timer so we can do the energy consuming work and
+    // publish the accumulated rain during sleep.
     // Init wifi
     let radio_init = mk_static!(
         Controller<'static>,
@@ -141,12 +143,12 @@ async fn main(spawner: Spawner) -> ! {
     spawner.spawn(mqtt_task(stack, receiver)).unwrap();
 
     //PERIPHERALS
-    let dht_pin = Flex::new(peripherals.GPIO32);
     let mut transistor_pin = Output::new(
         peripherals.GPIO17,
         esp_hal::gpio::Level::High,
         OutputConfig::default(),
     );
+    let dht_pin = Flex::new(peripherals.GPIO32);
     let anemo_pin = Input::new(
         peripherals.GPIO27,
         InputConfig::default().with_pull(esp_hal::gpio::Pull::Up),
@@ -168,6 +170,7 @@ async fn main(spawner: Spawner) -> ! {
         I2cDevice::new(i2c_bus)
     );
 
+    // Finally the tasks for each sensors
     let sender_dht = MQTT_CHANNEL.sender();
     let sender_anemo = MQTT_CHANNEL.sender();
     let sender_as5600 = MQTT_CHANNEL.sender();

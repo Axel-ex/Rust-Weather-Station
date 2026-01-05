@@ -19,12 +19,12 @@ use esp_hal::rng::Rng;
 use esp_hal::rtc_cntl::sleep::RtcSleepConfig;
 use esp_hal::rtc_cntl::sleep::TimerWakeupSource;
 use esp_hal::rtc_cntl::sleep::{Ext0WakeupSource, WakeupLevel};
-use esp_hal::rtc_cntl::{Rtc, wakeup_cause};
-use esp_hal::system::SleepSource;
+use esp_hal::rtc_cntl::{wakeup_cause, Rtc};
 use esp_hal::system::software_reset;
+use esp_hal::system::SleepSource;
 use esp_hal::time::Duration;
 use esp_hal::timer::timg::{MwdtStage, TimerGroup};
-use esp_hal::{Async, i2c};
+use esp_hal::{i2c, Async};
 use esp_radio::Controller;
 use log::info;
 
@@ -37,7 +37,7 @@ use crate::config::CONFIG;
 use crate::tasks::anemo_task::anemo_task;
 use crate::tasks::as5600_task::as5600_task;
 use crate::tasks::ina219_task::ina210_task;
-use crate::tasks::mqtt_task::{MQTT_CHANNEL, mqtt_task};
+use crate::tasks::mqtt_task::{mqtt_task, MQTT_CHANNEL};
 use crate::tasks::ota_task::{init_ota, ota_task};
 use crate::tasks::wifi_task::{runner_task, wifi_task};
 use crate::utils::{inc_rain_tips, load_rain_tips, store_rain_tips, wait_for_stack};
@@ -90,7 +90,7 @@ async fn main(spawner: Spawner) -> ! {
     let now = now_s(&rtc);
     let mut next_full = load_next_full_measurement_s();
     if next_full == 0 {
-        next_full = now + CONFIG.deep_sleep_dur_secs as u64;
+        next_full = now + CONFIG.deep_sleep_dur_secs;
         store_next_full_measurement_s(next_full);
     } //first boot, we set the timer to sleep for deep sleep dur
 
@@ -194,11 +194,10 @@ async fn main(spawner: Spawner) -> ! {
 
     transistor_pin.set_low();
     watchdog.disable();
-    store_next_full_measurement_s(now_s(&rtc) + CONFIG.deep_sleep_dur_secs as u64);
+    store_next_full_measurement_s(now_s(&rtc) + CONFIG.deep_sleep_dur_secs);
     Timer::after_secs(1).await;
 
     let timer = TimerWakeupSource::new(core::time::Duration::from_secs(CONFIG.deep_sleep_dur_secs));
     rtc.sleep(&cfg, &[&timer, &ext0]);
-
-    loop {}
+    panic!();
 }

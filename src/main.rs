@@ -157,7 +157,7 @@ async fn main(spawner: Spawner) -> ! {
     let dht_pin = Flex::new(peripherals.GPIO32);
     let anemo_pin = Input::new(
         peripherals.GPIO27,
-        InputConfig::default().with_pull(esp_hal::gpio::Pull::Up),
+        InputConfig::default().with_pull(Pull::Up),
     );
 
     // I2C bus

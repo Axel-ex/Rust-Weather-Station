@@ -13,7 +13,7 @@ use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::mutex::Mutex;
 use embassy_time::Timer;
 use esp_hal::clock::CpuClock;
-use esp_hal::gpio::{Flex, Input, InputConfig, Output, OutputConfig};
+use esp_hal::gpio::{Flex, Input, InputConfig, Output, OutputConfig, Pull};
 use esp_hal::i2c::master::I2c;
 use esp_hal::rng::Rng;
 use esp_hal::rtc_cntl::sleep::RtcSleepConfig;
@@ -85,7 +85,12 @@ async fn main(spawner: Spawner) -> ! {
     let mut cfg = RtcSleepConfig::deep();
     cfg.set_rtc_fastmem_pd_en(false);
 
-    let ext0 = Ext0WakeupSource::new(peripherals.GPIO25, WakeupLevel::Low);
+    let mut gpio25 = peripherals.GPIO25;
+    let _rain_pin = Input::new(
+        gpio25.reborrow(),
+        InputConfig::default().with_pull(Pull::Up),
+    );
+    let ext0 = Ext0WakeupSource::new(gpio25, WakeupLevel::Low);
 
     let now = now_s(&rtc);
     let mut next_full = load_next_full_measurement_s();
@@ -102,6 +107,7 @@ async fn main(spawner: Spawner) -> ! {
         let timer = TimerWakeupSource::new(core::time::Duration::from_secs(sleep_secs as u64));
 
         inc_rain_tips(now);
+        Timer::after_millis(500).await;
         rtc.sleep(&cfg, &[&timer, &ext0]);
     }
 

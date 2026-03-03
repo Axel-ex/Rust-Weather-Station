@@ -44,7 +44,11 @@ static mut RAIN_TIPS: u32 = 0;
 
 pub fn load_rain_tips() -> u32 {
     let rain_tips = unsafe { RAIN_TIPS };
-    if rain_tips > 100 { 0 } else { rain_tips } //avoid unitialized weird values
+    if rain_tips > 100 {
+        0
+    } else {
+        rain_tips
+    } //avoid unitialized weird values
 }
 
 pub fn store_rain_tips(v: u32) {
@@ -67,6 +71,8 @@ pub fn inc_rain_tips(now: u64) {
         store_rain_tips(cur.saturating_add(1));
         store_last_tip(now);
         info!("Incremented to {}", load_rain_tips());
+    } else {
+        info!("Sensor must be stuck");
     }
 }
 

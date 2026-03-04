@@ -19,12 +19,12 @@ use esp_hal::rng::Rng;
 use esp_hal::rtc_cntl::sleep::RtcSleepConfig;
 use esp_hal::rtc_cntl::sleep::TimerWakeupSource;
 use esp_hal::rtc_cntl::sleep::{Ext0WakeupSource, WakeupLevel};
-use esp_hal::rtc_cntl::{Rtc, wakeup_cause};
-use esp_hal::system::SleepSource;
+use esp_hal::rtc_cntl::{wakeup_cause, Rtc};
 use esp_hal::system::software_reset;
+use esp_hal::system::SleepSource;
 use esp_hal::time::Duration;
 use esp_hal::timer::timg::{MwdtStage, TimerGroup};
-use esp_hal::{Async, i2c};
+use esp_hal::{i2c, Async};
 use esp_radio::Controller;
 use log::info;
 
@@ -37,7 +37,7 @@ use crate::config::CONFIG;
 use crate::tasks::anemo_task::anemo_task;
 use crate::tasks::as5600_task::as5600_task;
 use crate::tasks::ina219_task::ina210_task;
-use crate::tasks::mqtt_task::{MQTT_CHANNEL, mqtt_task};
+use crate::tasks::mqtt_task::{mqtt_task, MQTT_CHANNEL};
 use crate::tasks::ota_task::{init_ota, ota_task};
 use crate::tasks::wifi_task::{runner_task, wifi_task};
 use crate::utils::{inc_rain_tips, load_rain_tips, store_rain_tips, wait_for_stack};
@@ -159,7 +159,7 @@ async fn main(spawner: Spawner) -> ! {
         InputConfig::default().with_pull(Pull::Up),
     );
 
-    // I2C bus
+    // I2C bus, configure sda and scl with pull ups
     let i2c_dev = I2c::new(peripherals.I2C0, i2c::master::Config::default())
         .unwrap()
         .with_sda(peripherals.GPIO21)

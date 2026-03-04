@@ -3,7 +3,7 @@
 //! calulate the rotations of the anemo and publish it.
 //!
 //! More details about this module.
-use embassy_futures::select::{Either, select};
+use embassy_futures::select::{select, Either};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Sender};
 use embassy_time::{Duration, Instant, Ticker};
 use esp_hal::gpio::Input;
@@ -14,7 +14,7 @@ use crate::{
     tasks::mqtt_task::MqttPacket,
 };
 
-const DEBOUNCE: Duration = Duration::from_millis(5);
+const DEBOUNCE: Duration = Duration::from_millis(200);
 
 #[embassy_executor::task]
 pub async fn anemo_task(
@@ -51,5 +51,5 @@ pub async fn anemo_task(
 }
 
 fn caclulate_windspeed(rotations: u64) -> f32 {
-    rotations as f32 * (1.05 / CONFIG.task_dur_secs as f32) * 3.6 * 5.0
+    rotations as f32 * (1.05 / CONFIG.task_dur_secs as f32) * 3.6
 }

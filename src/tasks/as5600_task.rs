@@ -57,7 +57,7 @@ pub async fn as5600_task(
     publish!(
         &mqtt_sender,
         "anemo/wind_angle",
-        sum_angle / nb_measurements
+        invert_angle(sum_angle / nb_measurements)
     );
 }
 
@@ -77,8 +77,14 @@ async fn get_wind_direction(
     (reading as f32) * (360.0 / 4096.0)
 }
 
+fn invert_angle(avg_angle: f32) -> f32 {
+    (360.0 - avg_angle) % 360.0
+}
+
 fn match_direction(avg_angle: f32) -> String<DEFAULT_STRING_SIZE> {
-    let direction = match avg_angle {
+    let corrected = invert_angle(avg_angle);
+
+    let direction = match corrected {
         0.0..45.0 => "N",
         45.0..90.0 => "NE",
         90.0..135.0 => "E",

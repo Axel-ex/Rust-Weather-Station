@@ -44,11 +44,7 @@ static mut RAIN_TIPS: u32 = 0;
 
 pub fn load_rain_tips() -> u32 {
     let rain_tips = unsafe { RAIN_TIPS };
-    if rain_tips > 100 {
-        0
-    } else {
-        rain_tips
-    } //avoid unitialized weird values
+    if rain_tips > 100 { 0 } else { rain_tips } //avoid unitialized weird values
 }
 
 pub fn store_rain_tips(v: u32) {
@@ -90,6 +86,7 @@ pub async fn wait_for_stack(stack: &Stack<'static>) -> Result<(), TimeoutError> 
     Ok(())
 }
 
+//publish a mqtt packet
 #[macro_export]
 macro_rules! publish {
     ($sender:expr, $suffix:expr, $val:expr) => {{
@@ -103,7 +100,7 @@ macro_rules! publish {
             &mut topic,
             ::core::format_args!("{}/{}", $crate::config::CONFIG.topic, $suffix),
         );
-        // This is effectively "{}"
+
         let _ = ::core::fmt::Write::write_fmt(&mut payload, ::core::format_args!("{}", $val));
 
         $sender
@@ -112,6 +109,7 @@ macro_rules! publish {
     }};
 }
 
+//create a static variable with static lifetime
 #[macro_export]
 macro_rules! mk_static {
     ($t:ty, $val:expr) => {{

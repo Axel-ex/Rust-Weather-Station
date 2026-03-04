@@ -19,12 +19,12 @@ use esp_hal::rng::Rng;
 use esp_hal::rtc_cntl::sleep::RtcSleepConfig;
 use esp_hal::rtc_cntl::sleep::TimerWakeupSource;
 use esp_hal::rtc_cntl::sleep::{Ext0WakeupSource, WakeupLevel};
-use esp_hal::rtc_cntl::{wakeup_cause, Rtc};
-use esp_hal::system::software_reset;
+use esp_hal::rtc_cntl::{Rtc, wakeup_cause};
 use esp_hal::system::SleepSource;
+use esp_hal::system::software_reset;
 use esp_hal::time::Duration;
 use esp_hal::timer::timg::{MwdtStage, TimerGroup};
-use esp_hal::{i2c, Async};
+use esp_hal::{Async, i2c};
 use esp_radio::Controller;
 use log::info;
 
@@ -37,7 +37,7 @@ use crate::config::CONFIG;
 use crate::tasks::anemo_task::anemo_task;
 use crate::tasks::as5600_task::as5600_task;
 use crate::tasks::ina219_task::ina210_task;
-use crate::tasks::mqtt_task::{mqtt_task, MQTT_CHANNEL};
+use crate::tasks::mqtt_task::{MQTT_CHANNEL, mqtt_task};
 use crate::tasks::ota_task::{init_ota, ota_task};
 use crate::tasks::wifi_task::{runner_task, wifi_task};
 use crate::utils::{inc_rain_tips, load_rain_tips, store_rain_tips, wait_for_stack};
@@ -81,7 +81,6 @@ async fn main(spawner: Spawner) -> ! {
 
     //Configure deep sleep
     let mut rtc = Rtc::new(peripherals.LPWR);
-
     let mut cfg = RtcSleepConfig::deep();
     cfg.set_rtc_fastmem_pd_en(false);
 
@@ -121,7 +120,7 @@ async fn main(spawner: Spawner) -> ! {
 
     let (controller, interfaces) =
         esp_radio::wifi::new(radio_init, peripherals.WIFI, Default::default())
-            .expect("Failed to initialize Wi-Fi controller");
+            .expect("Failed to initialize Wi-Fi/BLE controller");
 
     // Net stack
     let rng = Rng::new();

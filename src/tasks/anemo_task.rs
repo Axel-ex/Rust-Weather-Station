@@ -3,10 +3,11 @@
 //! calulate the rotations of the anemo and publish it.
 //!
 //! More details about this module.
-use embassy_futures::select::{select, Either};
+use embassy_futures::select::{Either, select};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Sender};
 use embassy_time::{Duration, Instant, Ticker};
 use esp_hal::gpio::Input;
+use log::info;
 
 use crate::{
     config::{CHANNEL_SIZE, CONFIG},
@@ -33,6 +34,7 @@ pub async fn anemo_task(
                 let now = Instant::now();
                 if now.duration_since(last) >= DEBOUNCE {
                     rotations += 1;
+                    info!("rotated!");
                     last = now;
                 }
             }

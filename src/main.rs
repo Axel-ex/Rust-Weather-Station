@@ -34,9 +34,9 @@ use crate::tasks::ina219_task::ina210_task;
 use crate::tasks::mqtt_task::{mqtt_task, MQTT_CHANNEL};
 use crate::tasks::ota_task::{init_ota, ota_task};
 use crate::tasks::wifi_task::{runner_task, wifi_task};
+use network::wait_for_stack;
 use rtc_manager::RtcManager;
 use tasks::dht_task::dht_task;
-use utils::wait_for_stack;
 
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo) -> ! {

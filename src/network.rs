@@ -1,4 +1,5 @@
 use embassy_net::{Runner, Stack, StackResources};
+use embassy_time::{Duration, TimeoutError, WithTimeout};
 use esp_hal::{peripherals::WIFI, rng::Rng};
 use esp_radio::{
     wifi::{WifiController, WifiDevice},
@@ -37,18 +38,18 @@ impl NetworkManager {
             runner,
         }
     }
-    //
-    // pub async fn wait_for_stack(&self) -> Result<(), TimeoutError> {
-    //     self.stack
-    //         .wait_config_up()
-    //         .with_timeout(Duration::from_secs(30))
-    //         .await?;
-    //
-    //     self.stack
-    //         .wait_link_up()
-    //         .with_timeout(Duration::from_secs(30))
-    //         .await?;
-    //
-    //     Ok(())
-    // }
+}
+
+pub async fn wait_for_stack(stack: &Stack<'static>) -> Result<(), TimeoutError> {
+    stack
+        .wait_config_up()
+        .with_timeout(Duration::from_secs(30))
+        .await?;
+
+    stack
+        .wait_link_up()
+        .with_timeout(Duration::from_secs(30))
+        .await?;
+
+    Ok(())
 }

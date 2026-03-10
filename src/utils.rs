@@ -1,20 +1,3 @@
-use embassy_net::Stack;
-use embassy_time::{Duration, TimeoutError, WithTimeout};
-
-pub async fn wait_for_stack(stack: &Stack<'static>) -> Result<(), TimeoutError> {
-    stack
-        .wait_config_up()
-        .with_timeout(Duration::from_secs(30))
-        .await?;
-
-    stack
-        .wait_link_up()
-        .with_timeout(Duration::from_secs(30))
-        .await?;
-
-    Ok(())
-}
-
 //publish a mqtt packet
 #[macro_export]
 macro_rules! publish {

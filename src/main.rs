@@ -8,29 +8,23 @@
 
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
-use embassy_net::StackResources;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::mutex::Mutex;
 use embassy_time::Timer;
 use esp_hal::clock::CpuClock;
-use esp_hal::gpio::{Flex, Input, InputConfig, Output, OutputConfig, Pull};
 use esp_hal::i2c::master::I2c;
-use esp_hal::rng::Rng;
-use esp_hal::rtc_cntl::sleep::RtcSleepConfig;
-use esp_hal::rtc_cntl::sleep::TimerWakeupSource;
-use esp_hal::rtc_cntl::sleep::{Ext0WakeupSource, WakeupLevel};
-use esp_hal::rtc_cntl::{wakeup_cause, Rtc};
+use esp_hal::rtc_cntl::wakeup_cause;
 use esp_hal::system::software_reset;
 use esp_hal::system::SleepSource;
-use esp_hal::time::Duration;
-use esp_hal::timer::timg::{MwdtStage, TimerGroup};
-use esp_hal::{i2c, Async};
-use esp_radio::Controller;
+use esp_hal::Async;
 use log::info;
 
 #[macro_use]
 pub mod utils;
 pub mod config;
+pub mod network;
+pub mod platform;
+pub mod rtc_manager;
 pub mod tasks;
 
 use crate::config::CONFIG;
@@ -40,22 +34,14 @@ use crate::tasks::ina219_task::ina210_task;
 use crate::tasks::mqtt_task::{mqtt_task, MQTT_CHANNEL};
 use crate::tasks::ota_task::{init_ota, ota_task};
 use crate::tasks::wifi_task::{runner_task, wifi_task};
-use crate::utils::{inc_rain_tips, load_rain_tips, store_rain_tips, wait_for_stack};
+use rtc_manager::RtcManager;
 use tasks::dht_task::dht_task;
-use utils::{load_next_full_measurement_s, now_s, store_next_full_measurement_s};
+use utils::wait_for_stack;
 
-//transistor 17
-//rain pin 25
-// dht 32
-// anemo 27
-// use esp_backtrace as _;
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo) -> ! {
     software_reset();
 }
-
-//I2c
-type BusI2C = I2c<'static, Async>;
 
 extern crate alloc;
 
@@ -70,108 +56,42 @@ async fn main(spawner: Spawner) -> ! {
     let peripherals = esp_hal::init(config);
     esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 98767);
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0);
+    let mut platform = platform::Platform::new(peripherals);
+    esp_rtos::start(platform.timg0.timer0);
 
-    let timg1 = TimerGroup::new(peripherals.TIMG1);
-    let mut watchdog = timg1.wdt;
-    let watchdog_timeout = Duration::from_secs(CONFIG.main_task_dur_secs + 10);
-    watchdog.set_timeout(MwdtStage::Stage0, watchdog_timeout);
-    watchdog.enable();
+    let mut rtc_manager = RtcManager::new(platform.rain_pin, platform.lpwr);
+    rtc_manager.init_next_full_measurement();
 
-    //Configure deep sleep
-    let mut rtc = Rtc::new(peripherals.LPWR);
-    let mut cfg = RtcSleepConfig::deep();
-    cfg.set_rtc_fastmem_pd_en(false);
-
-    let mut gpio25 = peripherals.GPIO25;
-    let _rain_pin = Input::new(
-        gpio25.reborrow(),
-        InputConfig::default().with_pull(Pull::Up),
-    );
-    let ext0 = Ext0WakeupSource::new(gpio25, WakeupLevel::Low);
-
-    let now = now_s(&rtc);
-    let mut next_full = load_next_full_measurement_s();
-    if next_full == 0 {
-        next_full = now + CONFIG.deep_sleep_dur_secs;
-        store_next_full_measurement_s(next_full);
-    } //first boot, we set the timer to sleep for deep sleep dur
-
-    //if we detected rain, we increment the var and sleep for next full - now.
     if let SleepSource::Ext0 = wakeup_cause() {
-        let remaining = next_full - now;
-        let sleep_secs = core::cmp::max(remaining, 1); //avoid 0
-
-        let timer = TimerWakeupSource::new(core::time::Duration::from_secs(sleep_secs as u64));
-
-        inc_rain_tips(now);
-        Timer::after_millis(500).await;
-        rtc.sleep(&cfg, &[&timer, &ext0]);
+        rtc_manager.handle_external_wakeup().await;
     }
 
-    // If not we woke up from the deep sleep timer so we can do the energy consuming work and
-    // publish the accumulated rain during sleep.
-    // Init wifi
-    let radio_init = mk_static!(
-        Controller<'static>,
-        esp_radio::init().expect("Failed to initialize Wi-Fi/BLE controller")
-    );
+    // Woke up from deep sleep timer
+    let network_manager = network::NetworkManager::new(platform.wifi);
 
-    let (controller, interfaces) =
-        esp_radio::wifi::new(radio_init, peripherals.WIFI, Default::default())
-            .expect("Failed to initialize Wi-Fi/BLE controller");
-
-    // Net stack
-    let rng = Rng::new();
-    let seed = (rng.random() as u64) << 32 | rng.random() as u64;
-
-    let (stack, runner) = embassy_net::new(
-        interfaces.sta,
-        embassy_net::Config::dhcpv4(Default::default()),
-        mk_static!(StackResources<6>, StackResources::<6>::new()),
-        seed,
-    );
     let receiver = MQTT_CHANNEL.receiver();
-    spawner.spawn(runner_task(runner)).ok();
-    spawner.spawn(wifi_task(controller)).ok();
-    wait_for_stack(&stack)
+    spawner.spawn(runner_task(network_manager.runner)).ok();
+    spawner.spawn(wifi_task(network_manager.controller)).ok();
+    wait_for_stack(&network_manager.stack)
         .await
-        .inspect(|_| info!("Got config: {:?}", stack.config_v4()))
-        .unwrap();
+        .expect("The network stack failed to get up");
 
     //check for OTA
-    let flash = peripherals.FLASH;
-    let ota_handle = init_ota(flash);
-    ota_task(stack, ota_handle, &mut watchdog).await;
+    let ota_handle = init_ota(platform.flash);
+    ota_task(network_manager.stack, ota_handle, &mut platform.watchdog).await;
 
-    spawner.spawn(mqtt_task(stack, receiver)).unwrap();
-
-    //PERIPHERALS
-    let mut transistor_pin = Output::new(
-        peripherals.GPIO17,
-        esp_hal::gpio::Level::High,
-        OutputConfig::default(),
-    );
-    let dht_pin = Flex::new(peripherals.GPIO32);
-    let anemo_pin = Input::new(
-        peripherals.GPIO27,
-        InputConfig::default().with_pull(Pull::Up),
-    );
+    spawner
+        .spawn(mqtt_task(network_manager.stack, receiver))
+        .unwrap();
 
     // I2C bus, configure sda and scl with pull ups
-    let i2c_dev = I2c::new(peripherals.I2C0, i2c::master::Config::default())
-        .unwrap()
-        .with_sda(peripherals.GPIO21)
-        .with_scl(peripherals.GPIO22)
-        .into_async();
-    let i2c_bus = mk_static!(Mutex<CriticalSectionRawMutex, BusI2C>, Mutex::new(i2c_dev));
+    let i2c_bus = mk_static!(Mutex<CriticalSectionRawMutex, I2c<'static, Async>>, Mutex::new(platform.i2c_dev));
     let ina_i2c = mk_static!(
-        I2cDevice<'static, CriticalSectionRawMutex, BusI2C>,
+        I2cDevice<'static, CriticalSectionRawMutex, I2c<'static, Async>>,
         I2cDevice::new(i2c_bus)
     );
     let as_i2c = mk_static!(
-        I2cDevice<'static, CriticalSectionRawMutex, BusI2C>,
+        I2cDevice<'static, CriticalSectionRawMutex, I2c<'static, Async>>,
         I2cDevice::new(i2c_bus)
     );
 
@@ -181,28 +101,30 @@ async fn main(spawner: Spawner) -> ! {
     let sender_as5600 = MQTT_CHANNEL.sender();
     let sender_ina219 = MQTT_CHANNEL.sender();
 
-    spawner.spawn(dht_task(dht_pin, sender_dht)).ok();
-    spawner.spawn(anemo_task(anemo_pin, sender_anemo)).ok();
+    spawner.spawn(dht_task(platform.dht_pin, sender_dht)).ok();
+    spawner
+        .spawn(anemo_task(platform.anemo_pin, sender_anemo))
+        .ok();
     spawner.spawn(as5600_task(as_i2c, sender_as5600)).ok();
     spawner.spawn(ina210_task(ina_i2c, sender_ina219)).ok();
 
     publish!(
         MQTT_CHANNEL.sender(),
         "rain",
-        load_rain_tips() as f32 * 0.231
+        rtc_manager.load_rain_tips() as f32 * 0.231
     );
-    store_rain_tips(0);
+    rtc_manager.store_rain_tips(0);
 
-    watchdog.feed();
+    platform.watchdog.feed();
     Timer::after_secs(CONFIG.main_task_dur_secs).await;
     info!("Going to sleep...");
 
-    transistor_pin.set_low();
-    watchdog.disable();
-    store_next_full_measurement_s(now_s(&rtc) + CONFIG.deep_sleep_dur_secs);
+    platform.transistor_pin.set_low();
+    platform.watchdog.disable();
+    rtc_manager.set_next_full_measurement_s(CONFIG.deep_sleep_dur_secs);
     Timer::after_secs(1).await;
 
-    let timer = TimerWakeupSource::new(core::time::Duration::from_secs(CONFIG.deep_sleep_dur_secs));
-    rtc.sleep(&cfg, &[&timer, &ext0]);
+    rtc_manager.set_deep_sleep_timer(core::time::Duration::from_secs(CONFIG.deep_sleep_dur_secs));
+    rtc_manager.sleep();
     panic!();
 }

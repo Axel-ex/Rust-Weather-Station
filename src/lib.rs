@@ -1,5 +1,13 @@
 #![no_std]
 
+#[macro_use]
+pub mod utils;
+pub mod config;
+pub mod network;
+pub mod rtc_manager;
+pub mod sensors;
+pub mod tasks;
+
 use crate::{
     config::CONFIG,
     network::{init_network, wait_for_stack},
@@ -11,7 +19,7 @@ use crate::{
         dht_task::dht_task,
         ina219_task::ina210_task,
         mqtt_task::{mqtt_task, MQTT_CHANNEL},
-        ota_task::ota_task,
+        ota_task::check_for_ota,
         wifi_task::{runner_task, wifi_task},
     },
 };
@@ -29,14 +37,6 @@ use esp_hal::{
 use esp_hal_ota::Ota;
 use esp_storage::FlashStorage;
 use log::info;
-
-#[macro_use]
-pub mod utils;
-pub mod config;
-pub mod network;
-pub mod rtc_manager;
-pub mod sensors;
-pub mod tasks;
 
 type ShareI2cBus = &'static mut I2cDevice<'static, CriticalSectionRawMutex, I2c<'static, Async>>;
 
@@ -58,7 +58,6 @@ pub async fn measuring_window(
     wifi: WIFI<'static>,
     ota_handle: &'static mut Ota<FlashStorage<'static>>,
 ) {
-    // set up network stack
     let (controller, stack, runner) = init_network(wifi);
     spawner.spawn(runner_task(runner)).ok();
     spawner.spawn(wifi_task(controller)).ok();
@@ -66,8 +65,7 @@ pub async fn measuring_window(
         .await
         .expect("The network stack failed to get up");
 
-    //check for OTA
-    ota_task(stack, ota_handle, watchdog).await;
+    check_for_ota(stack, ota_handle, watchdog).await;
 
     // Create communication channels
     let receiver = MQTT_CHANNEL.receiver();
@@ -98,7 +96,7 @@ pub async fn measuring_window(
     watchdog.feed();
     Timer::after_secs(CONFIG.main_task_dur_secs).await;
 
-    sensors.transistor_pin.set_low();
+    sensors.transistor_pin.set_low(); //turn off peripherals
     watchdog.disable();
     rtc_manager.set_next_full_measurement_s(CONFIG.deep_sleep_dur_secs);
     rtc_manager.set_deep_sleep_timer(core::time::Duration::from_secs(CONFIG.deep_sleep_dur_secs));

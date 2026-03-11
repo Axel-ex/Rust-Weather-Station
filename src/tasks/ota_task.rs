@@ -3,7 +3,7 @@ use embassy_net::{
     dns::DnsSocket,
     tcp::client::{TcpClient, TcpClientState},
 };
-use embassy_time::{Duration, with_timeout};
+use embassy_time::{with_timeout, Duration};
 use embedded_io_async::Read as _;
 use esp_hal::peripherals::FLASH;
 use esp_hal::peripherals::TIMG1;
@@ -27,7 +27,7 @@ type OtaType = Ota<FlashStorage<'static>>;
 
 static OTA_CELL: StaticCell<OtaType> = StaticCell::new();
 
-pub async fn ota_task(
+pub async fn check_for_ota(
     stack: embassy_net::Stack<'static>,
     ota_handle: &'static mut OtaType,
     watchdog: &mut Wdt<TIMG1<'_>>,

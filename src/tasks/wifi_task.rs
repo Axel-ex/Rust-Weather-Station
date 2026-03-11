@@ -18,7 +18,6 @@ pub async fn wifi_task(mut controller: WifiController<'static>) {
 
     controller.set_config(&client_cfg).unwrap();
 
-    log::info!("Starting WiFi (STA)...");
     log::info!("Connecting to {} {}", CONFIG.ssid, CONFIG.wifi_pass);
 
     controller.start_async().await.unwrap();

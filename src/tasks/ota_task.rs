@@ -57,11 +57,11 @@ pub async fn check_for_ota(
                         do_update(response, ota_handle, watchdog).await;
                     }
                     Err(e) => {
-                        error!("Sending the request: {:?}", e);
+                        error!("Sending the request: {e:?}");
                     }
                 }
             }
-            Err(e) => error!("Error: {:?}", e),
+            Err(e) => error!("Error: {e:?}"),
         }
     }
     info!("No update found! continuing...");
@@ -84,10 +84,7 @@ pub async fn do_update<'resp, 'buf, C>(
     let flash_size = response.content_length.unwrap_or_default() as u32;
     let target_crc = get_crc(response.headers());
 
-    info!(
-        "OTA: flash_size = {}, target_crc = {}",
-        flash_size, target_crc
-    );
+    info!("OTA: flash_size = {flash_size}, target_crc = {target_crc}",);
 
     ota_handle
         .ota_begin(flash_size, target_crc)
@@ -108,20 +105,17 @@ pub async fn do_update<'resp, 'buf, C>(
 
         watchdog.feed();
         let n = reader.read(&mut chunk[..to_read]).await.unwrap();
-        info!("OTA: read {} bytes", n);
+        info!("OTA: read {n} bytes");
 
         if n == 0 {
-            error!(
-                "OTA: unexpected EOF after {} bytes (expected {})",
-                bytes_sent, flash_size
-            );
+            error!("OTA: unexpected EOF after {bytes_sent} bytes (expected {flash_size})",);
             break;
         }
 
         bytes_sent += n as u32;
 
         let res = ota_handle.ota_write_chunk(&chunk[..n]);
-        info!("OTA: ota_write_chunk -> {:?}", res);
+        info!("OTA: ota_write_chunk -> {res:?}");
 
         // led.set_low();
         if res == Ok(true) {
@@ -133,20 +127,20 @@ pub async fn do_update<'resp, 'buf, C>(
                     esp_hal::system::software_reset();
                 }
                 Err(e) => {
-                    error!("OTA: flush error: {:?}", e);
+                    error!("OTA: flush error: {e:?}");
                 }
             }
             break;
         }
     }
 
-    info!("OTA: total bytes sent to OTA: {}", bytes_sent);
+    info!("OTA: total bytes sent to OTA: {bytes_sent}");
 }
 
 pub fn get_crc(headers: HeaderIterator) -> u32 {
     for (name, value) in headers {
         if name.eq_ignore_ascii_case("target_crc") {
-            info!("got crc: {:?}", value);
+            info!("got crc: {value:?}");
             let s = core::str::from_utf8(value).unwrap_or("0");
             if let Ok(crc) = s.trim().parse::<u32>() {
                 return crc;

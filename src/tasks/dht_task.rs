@@ -12,7 +12,6 @@ pub async fn dht_task(
     mqtt_sender: Sender<'static, CriticalSectionRawMutex, MqttPacket, CHANNEL_SIZE>,
 ) {
     let mut delay = Delay;
-    info!("Starting the dht");
     // Configure as open-drain with pull-up, then enable output+input
     dht_pin.apply_output_config(
         &OutputConfig::default()
@@ -29,10 +28,6 @@ pub async fn dht_task(
     while retry < MAX_RETRY {
         match dht22_async::read(&mut delay, &mut dht_pin).await {
             Ok(reading) => {
-                info!(
-                    "Got {}C {}%",
-                    reading.temperature, reading.relative_humidity
-                );
                 publish!(&mqtt_sender, "temperature", reading.temperature);
                 publish!(&mqtt_sender, "humidity", reading.relative_humidity);
                 break;

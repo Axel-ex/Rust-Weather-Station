@@ -10,7 +10,6 @@ pub mod tasks;
 
 use crate::{
     config::CONFIG,
-    network::{init_network, wait_for_stack},
     rtc_manager::RtcManager,
     sensors::Sensors,
     tasks::{
@@ -19,23 +18,20 @@ use crate::{
         dht_task::dht_task,
         ina219_task::ina210_task,
         mqtt_task::{mqtt_task, MQTT_CHANNEL},
-        ota_task::check_for_ota,
-        wifi_task::{runner_task, wifi_task},
     },
 };
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
+use embassy_net::Stack;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::Timer;
 use esp_hal::{
     i2c::master::I2c,
-    peripherals::{TIMG1, WIFI},
+    peripherals::TIMG1,
     time::Duration,
     timer::timg::{TimerGroup, Wdt},
     Async,
 };
-use esp_hal_ota::Ota;
-use esp_storage::FlashStorage;
 use log::info;
 
 type ShareI2cBus = &'static mut I2cDevice<'static, CriticalSectionRawMutex, I2c<'static, Async>>;
@@ -55,18 +51,8 @@ pub async fn measuring_window(
     rtc_manager: &mut RtcManager,
     watchdog: &mut Wdt<TIMG1<'static>>,
     mut sensors: Sensors,
-    wifi: WIFI<'static>,
-    ota_handle: &'static mut Ota<FlashStorage<'static>>,
+    stack: Stack<'static>,
 ) {
-    let (controller, stack, runner) = init_network(wifi);
-    spawner.spawn(runner_task(runner)).ok();
-    spawner.spawn(wifi_task(controller)).ok();
-    wait_for_stack(&stack)
-        .await
-        .expect("The network stack failed to get up");
-
-    check_for_ota(stack, ota_handle, watchdog).await;
-
     // Create communication channels
     let receiver = MQTT_CHANNEL.receiver();
     let sender_dht = MQTT_CHANNEL.sender();

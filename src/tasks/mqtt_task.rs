@@ -39,7 +39,7 @@ pub async fn mqtt_task(
         IpAddress::from_str(CONFIG.broker_ip).unwrap(),
         CONFIG.broker_port,
     );
-    debug!("Broker address: {:#?}", broker);
+    debug!("Broker address: {broker:?}");
 
     // Create a TCP socket
     let mut tcp_rx = [0; BUFFER_SIZE];

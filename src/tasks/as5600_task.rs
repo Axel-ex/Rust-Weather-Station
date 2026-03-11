@@ -14,7 +14,7 @@ use crate::{
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 
 use heapless::String;
-use log::{error, info};
+use log::error;
 
 const MEASUREMENT_FREQ: u64 = 2;
 const INVALID_ANGLE: f32 = 361.0;
@@ -26,7 +26,6 @@ pub async fn as5600_task(
 ) {
     let mut encoder = As5600::new(i2c);
 
-    info!("Starting as5600 task");
     let mut ticker = Ticker::every(Duration::from_secs(CONFIG.task_dur_secs));
     let mut nb_measurements: f32 = 0.0;
     let mut sum_angle: f32 = 0.0;
@@ -48,7 +47,7 @@ pub async fn as5600_task(
             }
         }
     }
-    info!("avg angle: {}", sum_angle / nb_measurements);
+
     publish!(
         &mqtt_sender,
         "anemo/wind_direction",

@@ -12,11 +12,14 @@ use esp_hal::rtc_cntl::wakeup_cause;
 use esp_hal::system::software_reset;
 use esp_hal::system::SleepSource;
 use esp_hal::timer::timg::TimerGroup;
-use Weather_Station_Embassy::init_watchdog;
-use Weather_Station_Embassy::measuring_window;
+use weather_station_embassy::init_watchdog;
+use weather_station_embassy::measuring_window;
+use weather_station_embassy::network::bring_network_up;
 
-use Weather_Station_Embassy::{
-    rtc_manager::RtcManager, sensors::Sensors, tasks::ota_task::init_ota,
+use weather_station_embassy::{
+    rtc_manager::RtcManager,
+    sensors::Sensors,
+    tasks::ota_task::{check_for_ota, init_ota},
 };
 
 #[panic_handler]
@@ -49,15 +52,12 @@ async fn main(spawner: Spawner) -> ! {
         rtc_manager.handle_external_wakeup().await;
     }
 
-    measuring_window(
-        &spawner,
-        &mut rtc_manager,
-        &mut watchdog,
-        sensors,
-        p.WIFI,
-        init_ota(p.FLASH),
-    )
-    .await;
+    let stack = bring_network_up(p.WIFI, &spawner).await;
+
+    let ota_handle = init_ota(p.FLASH);
+    check_for_ota(stack, ota_handle, &mut watchdog).await;
+
+    measuring_window(&spawner, &mut rtc_manager, &mut watchdog, sensors, stack).await;
 
     rtc_manager.sleep();
     panic!();

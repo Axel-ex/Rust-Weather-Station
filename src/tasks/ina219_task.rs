@@ -16,7 +16,6 @@ pub async fn ina210_task(
     i2c: &'static mut I2cDevice<'static, CriticalSectionRawMutex, I2c<'static, Async>>,
     mqtt_sender: Sender<'static, CriticalSectionRawMutex, MqttPacket, CHANNEL_SIZE>,
 ) {
-    info!("Starting the ina task");
     let current_lsb = MicroAmpere(15); // max current (0.5A) / 32767 (size of reg)
     let r_shunt_uohm = 100_000;
 
@@ -31,13 +30,11 @@ pub async fn ina210_task(
     };
 
     let mut retry = 0;
-    info!("Ina is measuring");
     while retry < MAX_RETRY {
         match ina.bus_voltage().await {
             Ok(voltage) => {
                 let voltage = (voltage.voltage_mv() + 160) as f32;
 
-                info!("Ina got: {voltage:?}");
                 publish!(&mqtt_sender, "battery/voltage", voltage);
                 publish!(
                     &mqtt_sender,

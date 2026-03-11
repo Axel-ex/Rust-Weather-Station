@@ -1,11 +1,11 @@
 [package]
 edition      = "2024"
-name         = "Weather-Station-Embassy"
+name         = "weather-station-embassy"
 rust-version = "1.88"
 version      = "0.1.0"
 
 [[bin]]
-name = "Weather-Station-Embassy"
+name = "weather-station-embassy"
 path = "./src/main.rs"
 test = false
 doctest = false

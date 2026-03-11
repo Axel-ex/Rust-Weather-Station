@@ -1,3 +1,5 @@
+use crate::tasks::wifi_task::{runner_task, wifi_task};
+use embassy_executor::Spawner;
 use embassy_net::{Runner, Stack, StackResources};
 use embassy_time::{Duration, TimeoutError, WithTimeout};
 use esp_hal::{peripherals::WIFI, rng::Rng};
@@ -5,6 +7,17 @@ use esp_radio::{
     wifi::{WifiController, WifiDevice},
     Controller,
 };
+
+pub async fn bring_network_up(wifi: WIFI<'static>, spawner: &Spawner) -> Stack<'static> {
+    let (controller, stack, runner) = init_network(wifi);
+    spawner.spawn(runner_task(runner)).ok();
+    spawner.spawn(wifi_task(controller)).ok();
+    wait_for_stack(&stack)
+        .await
+        .expect("The network stack failed to get up");
+
+    stack
+}
 
 pub fn init_network(
     wifi: WIFI<'static>,

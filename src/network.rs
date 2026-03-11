@@ -6,38 +6,32 @@ use esp_radio::{
     Controller,
 };
 
-pub struct NetworkManager {
-    pub controller: WifiController<'static>,
-    pub stack: Stack<'static>,
-    pub runner: Runner<'static, WifiDevice<'static>>,
-}
+pub fn init_network(
+    wifi: WIFI<'static>,
+) -> (
+    WifiController<'static>,
+    Stack<'static>,
+    Runner<'static, WifiDevice<'static>>,
+) {
+    let radio_init = mk_static!(
+        Controller<'static>,
+        esp_radio::init().expect("Failed to initialize Wi-Fi/BLE controller")
+    );
+    let (controller, interfaces) = esp_radio::wifi::new(radio_init, wifi, Default::default())
+        .expect("Failed to initialize Wi-Fi/BLE controller");
 
-impl NetworkManager {
-    pub fn new(wifi: WIFI<'static>) -> Self {
-        let radio_init = mk_static!(
-            Controller<'static>,
-            esp_radio::init().expect("Failed to initialize Wi-Fi/BLE controller")
-        );
-        let (controller, interfaces) = esp_radio::wifi::new(radio_init, wifi, Default::default())
-            .expect("Failed to initialize Wi-Fi/BLE controller");
+    // Net stack
+    let rng = Rng::new();
+    let seed = (rng.random() as u64) << 32 | rng.random() as u64;
 
-        // Net stack
-        let rng = Rng::new();
-        let seed = (rng.random() as u64) << 32 | rng.random() as u64;
+    let (stack, runner) = embassy_net::new(
+        interfaces.sta,
+        embassy_net::Config::dhcpv4(Default::default()),
+        mk_static!(StackResources<6>, StackResources::<6>::new()),
+        seed,
+    );
 
-        let (stack, runner) = embassy_net::new(
-            interfaces.sta,
-            embassy_net::Config::dhcpv4(Default::default()),
-            mk_static!(StackResources<6>, StackResources::<6>::new()),
-            seed,
-        );
-
-        Self {
-            controller,
-            stack,
-            runner,
-        }
-    }
+    (controller, stack, runner)
 }
 
 pub async fn wait_for_stack(stack: &Stack<'static>) -> Result<(), TimeoutError> {

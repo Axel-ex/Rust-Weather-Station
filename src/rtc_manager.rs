@@ -1,5 +1,6 @@
 use crate::config::CONFIG;
 use embassy_time::Timer;
+use esp_hal::gpio::{Input, InputConfig, Pull};
 use esp_hal::ram;
 use esp_hal::rtc_cntl::Rtc;
 use esp_hal::{
@@ -26,15 +27,21 @@ pub struct RtcManager {
 }
 
 impl RtcManager {
-    pub fn new(rain_pin: GPIO25<'static>, lpwr: LPWR<'static>) -> Self {
+    pub fn new(mut rain_gpio: GPIO25<'static>, lpwr: LPWR<'static>) -> Self {
         let mut rtc_cfg = RtcSleepConfig::deep();
         rtc_cfg.set_rtc_fastmem_pd_en(false);
         let rtc = Rtc::new(lpwr);
 
+        //config rain pin which is our external wake up source
+        let _rain_pin = Input::new(
+            rain_gpio.reborrow(),
+            InputConfig::default().with_pull(Pull::Up),
+        );
+
         RtcManager {
             rtc,
             rtc_cfg,
-            ext0: Ext0WakeupSource::new(rain_pin, esp_hal::rtc_cntl::sleep::WakeupLevel::Low),
+            ext0: Ext0WakeupSource::new(rain_gpio, esp_hal::rtc_cntl::sleep::WakeupLevel::Low),
             deep_sleep_timer: TimerWakeupSource::new(core::time::Duration::from_secs(
                 CONFIG.deep_sleep_dur_secs,
             )),

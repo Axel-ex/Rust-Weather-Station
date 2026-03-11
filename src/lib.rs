@@ -46,7 +46,7 @@ pub fn init_watchdog(timer_group1: TIMG1) -> Wdt<TIMG1> {
     watchdog
 }
 
-pub async fn measuring_window(
+pub async fn run_active_window(
     spawner: &Spawner,
     rtc_manager: &mut RtcManager,
     watchdog: &mut Wdt<TIMG1<'static>>,
@@ -61,7 +61,7 @@ pub async fn measuring_window(
     let sender_ina219 = MQTT_CHANNEL.sender();
 
     // spawn the tasks
-    let (ina_i2c, as_i2c) = share_i2c_bus(sensors.i2c_bus);
+    let (ina_i2c, as_i2c) = make_i2c_dev(sensors.i2c_bus);
     spawner.spawn(mqtt_task(stack, receiver)).unwrap();
     spawner
         .spawn(dht_task(sensors.dht_pin, sender_dht))
@@ -80,7 +80,7 @@ pub async fn measuring_window(
     );
     rtc_manager.store_rain_tips(0);
 
-    // wait for the task to perform their jobs
+    // wait for tasks to perform their jobs
     watchdog.feed();
     Timer::after_secs(CONFIG.main_task_dur_secs).await;
 
@@ -93,7 +93,7 @@ pub async fn measuring_window(
     Timer::after_secs(1).await;
 }
 
-fn share_i2c_bus(
+fn make_i2c_dev(
     i2c_bus: &'static Mutex<CriticalSectionRawMutex, I2c<'static, Async>>,
 ) -> (ShareI2cBus, ShareI2cBus) {
     let ina_i2c = mk_static!(

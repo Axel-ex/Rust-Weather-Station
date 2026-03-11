@@ -11,13 +11,12 @@ use log::info;
 
 //Variables store in RTC
 #[ram(unstable(rtc_fast), unstable(persistent))]
-static mut NEXT_FULL_MEASUREMENT_S: u64 = 0;
+static mut NEXT_FULL_MEASUREMENT_S: u64 = 0; // Needed to calculate how much time remains before
+                                             // waking up from deep sleep timer
 #[ram(unstable(rtc_fast), unstable(persistent))]
 static mut LAST_TIP: u64 = 0;
 #[ram(unstable(rtc_fast), unstable(persistent))]
 static mut RAIN_TIPS: u32 = 0;
-
-//RTC utils
 
 pub struct RtcManager {
     rtc: Rtc<'static>,

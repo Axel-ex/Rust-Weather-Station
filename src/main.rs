@@ -13,8 +13,8 @@ use esp_hal::system::software_reset;
 use esp_hal::system::SleepSource;
 use esp_hal::timer::timg::TimerGroup;
 use weather_station_embassy::init_watchdog;
-use weather_station_embassy::measuring_window;
 use weather_station_embassy::network::bring_network_up;
+use weather_station_embassy::run_active_window;
 
 use weather_station_embassy::{
     rtc_manager::RtcManager,
@@ -57,7 +57,7 @@ async fn main(spawner: Spawner) -> ! {
     let ota_handle = init_ota(p.FLASH);
     check_for_ota(stack, ota_handle, &mut watchdog).await;
 
-    measuring_window(&spawner, &mut rtc_manager, &mut watchdog, sensors, stack).await;
+    run_active_window(&spawner, &mut rtc_manager, &mut watchdog, sensors, stack).await;
 
     rtc_manager.sleep();
     panic!();

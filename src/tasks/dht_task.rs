@@ -4,7 +4,7 @@ use dht_sensor::dht22::r#async as dht22_async;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Sender};
 use embassy_time::{Delay, Timer};
 use esp_hal::gpio::{DriveMode, Flex, OutputConfig, Pull};
-use log::{error, info};
+use log::error;
 
 #[embassy_executor::task]
 pub async fn dht_task(

@@ -9,7 +9,7 @@ use esp_hal::Async;
 use ina219::address::Address;
 use ina219::calibration::{IntCalibration, MicroAmpere};
 use ina219::AsyncIna219;
-use log::{error, info};
+use log::error;
 
 #[embassy_executor::task]
 pub async fn ina210_task(

@@ -11,6 +11,12 @@ test = false
 doctest = false
 bench = false
 
+[lib]
+path = "./src/lib.rs"
+test = false
+doctest = false
+bench = false
+
 [dependencies]
 esp-hal = { version = "1.0.0", features = [
   "esp32",

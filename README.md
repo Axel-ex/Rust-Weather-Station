@@ -36,7 +36,7 @@ Shared resources, such as the I2C bus, are coordinated through `embassy-embedded
 
 ### Power management and scheduling
 
-The main task supervises all worker tasks for a configurable active window, feeds the watchdog, and then disconnects nonessential peripherals before putting the ESP32 into deep sleep. Wakeups occur either on the deep-sleep timer or on the external interrupt used for the rain gauge, which allows single tips to be published immediately.
+The main task supervises all worker tasks for a configurable active window, feeds the watchdog, and then disconnects nonessential peripherals before putting the ESP32 into deep sleep. Wakeups occur either on the deep-sleep timer or on the external interrupt used for the rain gauge, which allows single tips to be stored in RTC memory to be later published during the active measurement window. This prevent the esp from turning on the modem too often which will drain the battery.
 
 ## Configuration
 
@@ -58,13 +58,10 @@ Adjust `deep_sleep_dur_secs`, `main_task_dur_secs`, and `task_dur_secs` to contr
 ## Building and flashing
 
 1. Install the ESP32 Rust toolchain specified in `rust-toolchain.toml` and ensure you have `cargo-espflash` available.
-2. Connect the ESP32 over USB and place it into bootloader mode (usually by holding BOOT while pressing EN).
-3. Build and flash the firmware:
+2. Build and flash the firmware:
 
    ```bash
    cargo run
    ```
 
-   Replace the serial port path with the one that matches your workstation.
 
-After flashing, the station will connect to the configured Wi-Fi network, stream sensor values to the MQTT broker, and fall back to deep sleep between sampling intervals.

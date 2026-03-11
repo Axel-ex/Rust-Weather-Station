@@ -1,3 +1,14 @@
+//! Sensor hardware initialization and ownership.
+//!
+//! This module groups together the peripherals required by the physical
+//! sensors used in the weather station. It performs the one-time hardware
+//! configuration required before the measurement tasks are spawned.
+//!
+//! - `Sensors` acts as a *hardware bundle* created during boot.
+//! - The struct simply holds configured peripherals that will later be moved
+//!   into their respective tasks.
+//! - No sensor logic or polling happens here.
+//!
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::mutex::Mutex;
 use esp_hal::{

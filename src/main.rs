@@ -7,17 +7,19 @@
 )]
 
 use embassy_executor::Spawner;
-use esp_hal::clock::CpuClock;
-use esp_hal::rtc_cntl::wakeup_cause;
-use esp_hal::system::software_reset;
-use esp_hal::system::SleepSource;
-use esp_hal::timer::timg::TimerGroup;
-use weather_station_embassy::init_watchdog;
-use weather_station_embassy::network::bring_network_up;
-use weather_station_embassy::run_active_window;
-
+use embassy_time::Timer;
+use esp_hal::{
+    clock::CpuClock,
+    rtc_cntl::wakeup_cause,
+    system::{software_reset, SleepSource},
+    timer::timg::TimerGroup,
+};
+use log::info;
 use weather_station_embassy::{
+    init_watchdog,
+    network::bring_network_up,
     rtc_manager::RtcManager,
+    run_active_window,
     sensors::Sensors,
     tasks::ota_task::{check_for_ota, init_ota},
 };
@@ -42,7 +44,9 @@ async fn main(spawner: Spawner) -> ! {
 
     let mut watchdog = init_watchdog(p.TIMG1);
 
+    //Instanciate peripherals and i2c bus
     let sensors = Sensors::new(p.GPIO17, p.GPIO32, p.GPIO27, p.GPIO21, p.GPIO22, p.I2C0);
+
     esp_rtos::start(TimerGroup::new(p.TIMG0).timer0);
 
     let mut rtc_manager = RtcManager::new(p.GPIO25, p.LPWR);
@@ -58,7 +62,10 @@ async fn main(spawner: Spawner) -> ! {
     check_for_ota(stack, ota_handle, &mut watchdog).await;
 
     run_active_window(&spawner, &mut rtc_manager, &mut watchdog, sensors, stack).await;
+    watchdog.disable();
 
+    info!("Going to sleep...");
+    Timer::after_secs(1).await;
     rtc_manager.sleep();
     panic!();
 }

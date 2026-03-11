@@ -1,3 +1,12 @@
+//! Weather station firmware.
+//!
+//! High-level execution flow:
+//! - `main` performs hardware bring-up and boot-time decisions.
+//! - `RtcManager` restores wakeup state and manages deep sleep.
+//! - network and OTA are handled before the active measurement phase.
+//! - `measuring_window` runs sensor and MQTT tasks for a bounded time window.
+//! - the device then powers down peripherals and enters deep sleep.
+
 #![no_std]
 
 #[macro_use]
@@ -32,7 +41,6 @@ use esp_hal::{
     timer::timg::{TimerGroup, Wdt},
     Async,
 };
-use log::info;
 
 type ShareI2cBus = &'static mut I2cDevice<'static, CriticalSectionRawMutex, I2c<'static, Async>>;
 
@@ -46,6 +54,12 @@ pub fn init_watchdog(timer_group1: TIMG1) -> Wdt<TIMG1> {
     watchdog
 }
 
+/// Runs the active measurement phase.
+///
+/// This function assumes that network connectivity is already available and
+/// that OTA handling has already completed. It spawns the measurement tasks,
+/// publishes accumulated rain data stored in RTC memory, waits for the active
+/// tasks to complete, and prepare the board for the next sleep
 pub async fn run_active_window(
     spawner: &Spawner,
     rtc_manager: &mut RtcManager,
@@ -84,15 +98,12 @@ pub async fn run_active_window(
     watchdog.feed();
     Timer::after_secs(CONFIG.main_task_dur_secs).await;
 
-    sensors.transistor_pin.set_low(); //turn off peripherals
-    watchdog.disable();
     rtc_manager.set_next_full_measurement_s(CONFIG.deep_sleep_dur_secs);
     rtc_manager.set_deep_sleep_timer(core::time::Duration::from_secs(CONFIG.deep_sleep_dur_secs));
-
-    info!("Going to sleep...");
-    Timer::after_secs(1).await;
+    sensors.transistor_pin.set_low(); //turn off peripherals
 }
 
+/// Create sharable instance of the i2c bus
 fn make_i2c_dev(
     i2c_bus: &'static Mutex<CriticalSectionRawMutex, I2c<'static, Async>>,
 ) -> (ShareI2cBus, ShareI2cBus) {

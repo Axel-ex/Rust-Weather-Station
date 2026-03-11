@@ -3,7 +3,7 @@ use embassy_sync::mutex::Mutex;
 use esp_hal::{
     gpio::{Flex, Input, InputConfig, Output, OutputConfig, Pull},
     i2c::{self, master::I2c},
-    peripherals::{GPIO17, GPIO27, GPIO32, I2C0},
+    peripherals::{GPIO17, GPIO21, GPIO22, GPIO27, GPIO32, I2C0},
     Async,
 };
 
@@ -19,11 +19,15 @@ impl Sensors {
         transistor_gpio: GPIO17<'static>,
         dht_gpio: GPIO32<'static>,
         anemo_gpio: GPIO27<'static>,
+        sda_pin: GPIO21<'static>,
+        scl_pin: GPIO22<'static>,
         i2c: I2C0<'static>,
     ) -> Self {
         //i2c
         let i2c_dev = I2c::new(i2c, i2c::master::Config::default())
             .unwrap()
+            .with_sda(sda_pin)
+            .with_scl(scl_pin)
             .into_async();
         let i2c_bus =
             mk_static!(Mutex<CriticalSectionRawMutex, I2c<'static, Async>>, Mutex::new(i2c_dev));

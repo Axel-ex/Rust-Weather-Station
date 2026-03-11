@@ -39,7 +39,7 @@ async fn main(spawner: Spawner) -> ! {
 
     let mut watchdog = init_watchdog(p.TIMG1);
 
-    let sensors = Sensors::new(p.GPIO17, p.GPIO32, p.GPIO27, p.I2C0);
+    let sensors = Sensors::new(p.GPIO17, p.GPIO32, p.GPIO27, p.GPIO21, p.GPIO22, p.I2C0);
     esp_rtos::start(TimerGroup::new(p.TIMG0).timer0);
 
     let mut rtc_manager = RtcManager::new(p.GPIO25, p.LPWR);

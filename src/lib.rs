@@ -77,12 +77,14 @@ pub async fn measuring_window(
     // spawn the tasks
     let (ina_i2c, as_i2c) = share_i2c_bus(sensors.i2c_bus);
     spawner.spawn(mqtt_task(stack, receiver)).unwrap();
-    spawner.spawn(dht_task(sensors.dht_pin, sender_dht)).ok();
+    spawner
+        .spawn(dht_task(sensors.dht_pin, sender_dht))
+        .unwrap();
     spawner
         .spawn(anemo_task(sensors.anemo_pin, sender_anemo))
-        .ok();
-    spawner.spawn(as5600_task(as_i2c, sender_as5600)).ok();
-    spawner.spawn(ina210_task(ina_i2c, sender_ina219)).ok();
+        .unwrap();
+    spawner.spawn(as5600_task(as_i2c, sender_as5600)).unwrap();
+    spawner.spawn(ina210_task(ina_i2c, sender_ina219)).unwrap();
 
     //publish accumulated rain and reset RTC memory
     publish!(

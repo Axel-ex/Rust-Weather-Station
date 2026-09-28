@@ -57,7 +57,12 @@ Adjust `deep_sleep_dur_secs`, `main_task_dur_secs`, and `task_dur_secs` to contr
 
 ## Building and flashing
 
-1. Install the ESP32 Rust toolchain specified in `rust-toolchain.toml` and ensure you have `cargo-espflash` available.
+1. Install the pinned ESP32 Rust toolchain from `rust-toolchain.toml` and make sure `espflash` is available:
+
+   ```bash
+   espup install --toolchain-version 1.97.0.0 --name esp-1.97.0.0 --targets esp32 --export-file ~/export-esp-1.97.0.0.sh
+   . ~/export-esp-1.97.0.0.sh
+   ```
 2. Build and flash the firmware:
 
    ```bash

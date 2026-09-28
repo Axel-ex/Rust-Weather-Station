@@ -80,14 +80,14 @@ static_cell      = "2.1.1"
 embassy-sync = "0.7.2"
 esp-backtrace = { version = "0.18.0", features = ["esp32", "println", "panic-handler"]}
 heapless = "0.8.0"
-dht-sensor = { git = "https://github.com/michaelbeaumont/dht-sensor.git", branch = "main", features = ["async"] }
+dht-sensor = { git = "https://github.com/michaelbeaumont/dht-sensor.git", rev = "29ffaa0", features = ["async"] }
 ina219 = { version = "0.2.0", features = ["async"]}
 as5600 = { version = "0.8.0" , features = ["async"]}
 toml-cfg = "0.2.0"
-rust-mqtt = { git = "https://github.com/obabec/rust-mqtt", branch = "main", default-features = false }
+rust-mqtt = { git = "https://github.com/obabec/rust-mqtt", rev = "f478c75", default-features = false }
 embassy-embedded-hal = "0.5.0"
 embassy-futures = "0.1.2"
-esp-hal-ota = { version = "0.4.5", features = ["esp32", "log"] }
+esp-hal-ota = { version = "0.6.0", features = ["esp32", "log"] }
 reqwless = { version = "0.13", default-features = false }
 esp-storage = { version = "0.8.1", features = ["esp32"] }
 embedded-nal-async = "0.9.0"

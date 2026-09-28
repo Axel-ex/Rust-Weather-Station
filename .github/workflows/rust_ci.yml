@@ -24,11 +24,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Setup Rust
-        uses: esp-rs/xtensa-toolchain@v1.5
+        uses: esp-rs/xtensa-toolchain@v1.7
         with:
-          default: true
+          default: false
           buildtargets: esp32
           ldproxy: true
+          version: 1.97.0.0
+          name: esp-1.97.0.0
       - name: Enable caching
         uses: Swatinem/rust-cache@v2
       - name: Run command

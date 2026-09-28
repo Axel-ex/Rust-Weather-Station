@@ -1,2 +1,4 @@
 [toolchain]
-channel = "esp"
+# Pinned Xtensa toolchain. Install with:
+#   espup install --toolchain-version 1.97.0.0 --name esp-1.97.0.0
+channel = "esp-1.97.0.0"
